@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk-15.0.1">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JavaFX">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcublas-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcublas-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcuda-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-common-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcuda-common-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcuda-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcudnn-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcudnn-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcudnn-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcudnn-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcufft-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcufft-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcufft-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcufft-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcurand-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcurand-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcurand-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcurand-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusolver-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcusolver-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusolver-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcusolver-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusparse-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcusparse-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusparse-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jcusparse-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jnvgraph-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0.jar" sourcepath="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-sources.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcublas-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcublas-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcublas-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcuda-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcudnn-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcudnn-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcudnn-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcufft-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcufft-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcufft-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcurand-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcurand-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcurand-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusolver-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusolver-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusolver-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusparse-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusparse-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jcusparse-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-apple-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-linux-x86_64.jar"/>
+	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
