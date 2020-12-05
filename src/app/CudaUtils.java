@@ -20,7 +20,12 @@ public class CudaUtils {
 	private static boolean initalized = false;
 	private static CUdevice device;
 	private static CUcontext context;
-	public static void init() {
+	
+	static {
+		init();
+	}
+	
+	private static void init() {
 		if(initalized) return;
 		
 		JCudaDriver.setExceptionsEnabled(true);
