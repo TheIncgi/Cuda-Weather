@@ -124,8 +124,19 @@ public class Simulator {
 			pushData();
 			dataLoaded = true;
 		}
+		Pointer kernal = kernalParams[activeKernal];
 		
+		//sun warming
+		//infrared radiative cooling
+		//rates should be balanced
+		//pressure changes->wind
+		//fronts -> temp change -> percipitation
+		//moisture -> humdidity
+		//rainfall
+		//water accumulation -> lakes/rivers
+		//terrain alterations? dry: grass->desert,  warm: ice->water
 		
+		//
 	}
 	
 	public void setOnStepComplete(Consumer<GlobeData> onStepComplete) {

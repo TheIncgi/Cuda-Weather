@@ -27,6 +27,7 @@ public class GlobeData {
 	public final int altitudeDivisions;
 	
 	public static final float SIMULATION_HEIGHT_KM = 12;
+	public static final float SIMULATION_DEPTH_KM  = -.5f;
 	public static final float MAX_RAIN_CLOUD_HEIGHT_KM = 8;
 	public static final float EARTH_RADIUS_KM = 6371;
 	
@@ -47,21 +48,21 @@ public class GlobeData {
 	
 	/**Return the lower bound for this altitude index*/
 	public float altitudeLowerBound(int index) {
-		return index/(float)altitudeDivisions * SIMULATION_HEIGHT_KM;
+		return index/(float)altitudeDivisions * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
 	}
 	/**Return the lower bound for this altitude index*/
 	public float altitudeUpperBound(int index) {
-		return (index+1)/(float)altitudeDivisions * SIMULATION_HEIGHT_KM;
+		return (index+1)/(float)altitudeDivisions * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
 	}
 	
 	
 	public Optional<Integer> indexOfAltitude(float km) {
-		if(km < 0) return Optional.empty();
-		if(km > SIMULATION_HEIGHT_KM) return Optional.empty();
+		if(km < SIMULATION_DEPTH_KM) return Optional.empty();
+		if(km >= SIMULATION_HEIGHT_KM) return Optional.empty();
 		return Optional.of(indexOfAltitudeDirect(km));
 	}
 	public int indexOfAltitudeDirect(float km) {
-		return (int) ((km/SIMULATION_HEIGHT_KM) * altitudeDivisions);
+		return (int) MathUtils.map(km, SIMULATION_DEPTH_KM, SIMULATION_HEIGHT_KM, 0, altitudeDivisions);
 	}
 	
 	/**Corner of region*/
@@ -147,6 +148,7 @@ public class GlobeData {
 		GRASS,
 		STONE,
 		ICE,
-		FOREST
+		FOREST,
+		LAKE
 	}
 }
