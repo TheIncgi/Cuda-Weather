@@ -45,7 +45,7 @@ public class LetsCudaFunctionaly {
         CUdeviceptr deviceInputB = loadToGPU(hostInputB);
 
         // Allocate device output memory
-        CUdeviceptr deviceOutput = allocateFloatOut(numElements);
+        CUdeviceptr deviceOutput = allocateFloatArray(numElements);
         
 		
 		Pointer kernalParams = Pointer.to(

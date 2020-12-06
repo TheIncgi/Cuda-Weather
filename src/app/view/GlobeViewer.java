@@ -61,7 +61,7 @@ public class GlobeViewer extends BorderPane{
 				cloud.setColorEffect(new GaussianBlur(4));
 				cloud2.setColorEffect(new GaussianBlur(4));
 
-				terain.setBiomeColor(gd.groundType[la][lo], gd.groundMoisture[la][lo]);
+				terain.setBiomeColor(GlobeData.GroundType.values()[gd.groundType[la][lo]], gd.groundMoisture[la][lo]);
 
 
 

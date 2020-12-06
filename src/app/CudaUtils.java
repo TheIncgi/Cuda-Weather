@@ -7,6 +7,7 @@ import static jcuda.driver.JCudaDriver.cuMemAlloc;
 import static jcuda.driver.JCudaDriver.cuMemcpyDtoH;
 import static jcuda.driver.JCudaDriver.cuMemcpyHtoD;
 
+import app.util.Pair;
 import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUcontext;
@@ -70,9 +71,14 @@ public class CudaUtils {
 	     return ptr;
 	}
 	
-	public static CUdeviceptr allocateFloatOut(int len) {
+	public static CUdeviceptr allocateFloatArray(int len) {
 		CUdeviceptr out = new CUdeviceptr();
         cuMemAlloc(out, len * Sizeof.FLOAT);
+        return out;
+	}
+	public static CUdeviceptr allocateIntArray(int len) {
+		CUdeviceptr out = new CUdeviceptr();
+        cuMemAlloc(out, len * Sizeof.INT);
         return out;
 	}
 	
@@ -83,5 +89,12 @@ public class CudaUtils {
 	public static void getOutput(CUdeviceptr ptr, int[] out) {
         cuMemcpyDtoH(Pointer.to(out), ptr,
             out.length * Sizeof.FLOAT);
+	}
+	
+	public static CUdeviceptr pointerArray(CUdeviceptr... pointers) {
+		CUdeviceptr out = new CUdeviceptr();
+		cuMemAlloc(out, Sizeof.POINTER * pointers.length);
+		cuMemcpyHtoD(out, Pointer.to(pointers), Sizeof.POINTER * pointers.length);
+		return out;
 	}
 }

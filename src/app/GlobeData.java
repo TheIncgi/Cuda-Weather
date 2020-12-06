@@ -18,9 +18,9 @@ public class GlobeData {
 	/**[Latitude][logitude][altitude]*/
 	public final float[][][][] windSpeed;
 	/**[Latitude][logitude]*/
-	public final float[][]               snowCover, groundMoisture;
+	public final float[][]    snowCover, groundMoisture, elevation;
 	/**[Latitude][logitude]*/
-	public final GroundType[][] groundType;
+	public final int[][] groundType;
 	
 	public final int latitudeDivisions;
 	public final int longitudeDivisions;
@@ -41,7 +41,8 @@ public class GlobeData {
 		windSpeed = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions][3];
 		snowCover = new float[latitudeDivisions][longitudeDivisions];
 		groundMoisture = new float[latitudeDivisions][longitudeDivisions];
-		groundType = new GroundType[latitudeDivisions][longitudeDivisions];
+		groundType = new int[latitudeDivisions][longitudeDivisions];
+		elevation = new float[latitudeDivisions][longitudeDivisions];
 	}
 	
 	/**Return the lower bound for this altitude index*/
@@ -115,9 +116,10 @@ public class GlobeData {
 		Random r = new Random(seed);
 		for(int lat = 0; lat<latitudeDivisions; lat++) {
 			for(int lon = 0; lon<longitudeDivisions; lon++) {
-				groundType[lat][lon] = GroundType.values()[r.nextInt(GroundType.values().length)];
+				groundType[lat][lon] = r.nextInt(GroundType.values().length);
 				snowCover[lat][lon] = r.nextFloat()>.75? r.nextFloat()*5 : 0;
 				groundMoisture[lat][lon] = r.nextFloat();
+				elevation[lat][lon] = r.nextFloat() * 3000; //meters
 				for(int al = 0; al<altitudeDivisions; al++) {
 					temp[lat][lon][al] = r.nextFloat()*95;
 					humidity[lat][lon][al] = r.nextFloat();
