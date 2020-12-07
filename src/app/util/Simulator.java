@@ -15,7 +15,7 @@ public class Simulator {
 	Consumer<GlobeData> onStepComplete;
 	private float[] worldTime;
 	
-	private CUfunction func;
+	private CUfunction[] funcs;
 	private CUdeviceptr worldSizePtr;
 	private CUdeviceptr worldTimePtr;
 	//private CUdeviceptr[][] argPointers; //kernal, ordinal
@@ -31,7 +31,9 @@ public class Simulator {
 		in = world;
 		
 		CUmodule module = loadModule("WeatherSim.ptx");
-		func = getFunction(module, "timeStep");
+		funcs = new CUfunction[] {
+				getFunction(module, "identity")
+		};
 		
 		worldSizePtr = loadToGPU( new int[] { //constant
 				world.latitudeDivisions, 
@@ -136,7 +138,7 @@ public class Simulator {
 		//water accumulation -> lakes/rivers
 		//terrain alterations? dry: grass->desert,  warm: ice->water
 		
-		//
+		
 	}
 	
 	public void setOnStepComplete(Consumer<GlobeData> onStepComplete) {
