@@ -21,7 +21,7 @@
 {
 	.reg .pred 	%p<2>;
 	.reg .f32 	%f<4>;
-	.reg .b32 	%r<6>;
+	.reg .b32 	%r<18>;
 	.reg .b64 	%rd<11>;
 
 
@@ -29,10 +29,22 @@
 	ld.param.u64 	%rd1, [add_param_1];
 	ld.param.u64 	%rd2, [add_param_2];
 	ld.param.u64 	%rd3, [add_param_3];
-	mov.u32 	%r3, %ctaid.x;
-	mov.u32 	%r4, %ntid.x;
-	mov.u32 	%r5, %tid.x;
-	mad.lo.s32 	%r1, %r4, %r3, %r5;
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %nctaid.y;
+	mov.u32 	%r5, %ctaid.z;
+	mov.u32 	%r6, %ctaid.y;
+	mad.lo.s32 	%r7, %r4, %r5, %r6;
+	mov.u32 	%r8, %nctaid.x;
+	mov.u32 	%r9, %ctaid.x;
+	mad.lo.s32 	%r10, %r7, %r8, %r9;
+	mov.u32 	%r11, %ntid.z;
+	mov.u32 	%r12, %tid.z;
+	mad.lo.s32 	%r13, %r10, %r11, %r12;
+	mov.u32 	%r14, %ntid.y;
+	mov.u32 	%r15, %tid.y;
+	mad.lo.s32 	%r16, %r13, %r14, %r15;
+	mov.u32 	%r17, %tid.x;
+	mad.lo.s32 	%r1, %r16, %r3, %r17;
 	setp.ge.s32	%p1, %r1, %r2;
 	@%p1 bra 	BB0_2;
 

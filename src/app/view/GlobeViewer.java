@@ -11,9 +11,11 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToolBar;
 import javafx.scene.effect.GaussianBlur;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
 
 public class GlobeViewer extends BorderPane{
 	Pane layers = new Pane();
@@ -29,6 +31,7 @@ public class GlobeViewer extends BorderPane{
 			cloudCoverGridAll = new HashedGridPane("cloudAll"), 
 			windGrid = new HashedGridPane("wind"), 
 			snowGrid = new HashedGridPane("snow"), 
+			pressure = new HashedGridPane("pressure"),
 			rainGrid = new HashedGridPane("rain"); //this one is calculated from humidity
 
 	ComboBox<String> colorOverlay = new ComboBox<>(), numberOverlay = new ComboBox<>();
@@ -37,33 +40,47 @@ public class GlobeViewer extends BorderPane{
 	ToolBar layerModes = new ToolBar();
 	private GlobeData globeData;
 	Label debug = new Label("debug");
-
+	DebugPanel debugTile = new DebugPanel("Pos:","Latitude:","Longitude:","Altitude:","Elevation:", "Ground:", "Snow:", "Temp:","Humidity:","Cloud:", "Cloud Cover:", "Wind:", "Rain:", "Pressure:");
+	VBox rightPanel = new VBox(debug, debugTile);
+	
 	public GlobeViewer(GlobeData gd) {
 		this.globeData = gd;
 		for(int la=0; la<gd.latitudeDivisions; la++)
 			for(int lo=0; lo<gd.longitudeDivisions; lo++) {
-				FloatVisulaizationTile terain = new FloatVisulaizationTile();
-				FloatVisulaizationTile temp = new FloatVisulaizationTile();
-				FloatVisulaizationTile humid = new FloatVisulaizationTile();
-				FloatVisulaizationTile cloud = new FloatVisulaizationTile();
-				FloatVisulaizationTile cloud2 = new FloatVisulaizationTile();
-				FloatVisulaizationTile wind = new FloatVisulaizationTile();
-				FloatVisulaizationTile snow = new FloatVisulaizationTile();
-				FloatVisulaizationTile rain = new FloatVisulaizationTile();
+				FloatVisulaizationTile terain = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile temp = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile humid = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile cloud = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile cloud2 = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile wind = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile snow = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile rain = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile pres = new FloatVisulaizationTile(lo, la);
 
 				temp.setOpacity(OVERLAY_OPACITY);
 				humid.setOpacity(OVERLAY_OPACITY);
 				cloud.setOpacity(OVERLAY_OPACITY);
+				cloud2.setOpacity(OVERLAY_OPACITY);
 				wind.setOpacity(OVERLAY_OPACITY);
 				rain.setOpacity(OVERLAY_OPACITY);
 				snow.setOpacity(OVERLAY_OPACITY + (1-OVERLAY_OPACITY)/2);
+				pres.setOpacity(OVERLAY_OPACITY);
+				
 				snow.setColorEffect(new GaussianBlur(8));
 				cloud.setColorEffect(new GaussianBlur(4));
 				cloud2.setColorEffect(new GaussianBlur(4));
 
 				terain.setBiomeColor(GlobeData.GroundType.values()[gd.groundType[la][lo]], gd.groundMoisture[la][lo]);
 
-
+				terain.setOnMouseEntered(e->onMouseOver(terain));
+				temp.setOnMouseEntered(e->onMouseOver(terain));
+				humid.setOnMouseEntered(e->onMouseOver(terain));
+				cloud.setOnMouseEntered(e->onMouseOver(terain));
+				cloud2.setOnMouseEntered(e->onMouseOver(terain));
+				wind.setOnMouseEntered(e->onMouseOver(terain));
+				snow.setOnMouseEntered(e->onMouseOver(terain));
+				pres.setOnMouseEntered(e->onMouseOver(terain));
+				rain.setOnMouseEntered(e->onMouseOver(terain));
 
 				terainGrid.add(terain, lo, la);
 				tempGrid.add(temp, lo, la);
@@ -72,6 +89,7 @@ public class GlobeViewer extends BorderPane{
 				cloudCoverGridAlti.add(cloud2, lo, la);
 				windGrid.add(wind, lo, la);
 				snowGrid.add(snow, lo, la);
+				pressure.add(pres, lo, la);
 				rainGrid.add(rain, lo, la);
 
 				terain.setColorVisible(true);
@@ -80,12 +98,12 @@ public class GlobeViewer extends BorderPane{
 				snow.setColorVisible(true);
 			}
 
-		layers.getChildren().addAll(terainGrid, snowGrid);
+		layers.getChildren().addAll(terainGrid);
 
 		
 
-		numberOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Percipitation");
-		colorOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Percipitation");
+		numberOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
+		colorOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
 		numberOverlay.getSelectionModel().select(0);
 		colorOverlay.getSelectionModel().select(0);
 		altitudeSlider = new Slider(0, gd.altitudeDivisions-.5, 0);
@@ -94,7 +112,7 @@ public class GlobeViewer extends BorderPane{
 		altitudeSlider.valueProperty().addListener(e->onChangedMode());
 
 		layerModes.getItems().addAll(showSnow, altitudeSlider, new Label("Color-Number"),colorOverlay, numberOverlay);
-		showSnow.setSelected(true);
+		showSnow.setSelected(false);
 		showSnow.setOnAction(e->{
 			if(showSnow.isSelected() && !layers.getChildren().contains(snowGrid))
 				layers.getChildren().add(1, snowGrid); 
@@ -103,7 +121,7 @@ public class GlobeViewer extends BorderPane{
 
 		this.setTop(layerModes);
 		this.setCenter(scrolly);
-		this.setRight(debug);
+		this.setRight(rightPanel);
 
 		updateOverlays();
 	}
@@ -114,6 +132,8 @@ public class GlobeViewer extends BorderPane{
 	}
 
 	public void updateOverlays() {
+		debug.setText(String.format("World time: \n%8.4f\n%8.4f", globeData.time[0], globeData.time[1]));
+		
 		int altitude = (int) altitudeSlider.getValue();
 		float mixup = (float) (altitudeSlider.getValue() % 1);
 		for(int lat = 0; lat < globeData.latitudeDivisions; lat++) {
@@ -127,6 +147,10 @@ public class GlobeViewer extends BorderPane{
 
 						fvt.setPercentColor(cu);
 					}
+				}
+				if(cloudCoverGridAlti.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) {
+					if(fvt.isVisible())
+						fvt.setPercentColor(globeData.cloudCover[lat][lon][altitude]);
 				}
 				if(humidityGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) {
 					if(humidityGrid.isVisible()) {
@@ -149,6 +173,10 @@ public class GlobeViewer extends BorderPane{
 					if(windGrid.isVisible()) {
 						fvt.setWind(globeData.windSpeed[lat][lon][altitude]);
 					}
+				if(pressure.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
+					if(pressure.isVisible()) {
+						fvt.setPercentColor(globeData.pressure[lat][lon][altitude]/3);
+					}
 
 			}
 		}
@@ -156,7 +184,9 @@ public class GlobeViewer extends BorderPane{
 
 	public void onChangedMode() {
 		layers.getChildren().clear();
-		layers.getChildren().addAll(terainGrid, snowGrid);
+		layers.getChildren().add(terainGrid);
+		if(showSnow.isSelected())
+			layers.getChildren().add(snowGrid);
 		HashedGridPane col = 
 				switch(colorOverlay.getValue()) {
 				case "Humidity" -> humidityGrid;
@@ -165,6 +195,7 @@ public class GlobeViewer extends BorderPane{
 				case "Cloud Coverage-Alti" -> cloudCoverGridAlti;
 				case "Cloud Coverage-All"  -> cloudCoverGridAll;
 				case "Percipitation" -> rainGrid;
+				case "Pressure" -> pressure;
 				default -> null;
 				};
 		HashedGridPane num = 
@@ -175,6 +206,7 @@ public class GlobeViewer extends BorderPane{
 				case "Cloud Coverage-Alti" -> cloudCoverGridAlti;
 				case "Cloud Coverage-All"  -> cloudCoverGridAll;
 				case "Percipitation" -> rainGrid;
+				case "Pressure" -> pressure;
 				default -> null;
 		};
 
@@ -199,5 +231,27 @@ public class GlobeViewer extends BorderPane{
 			layers.getChildren().add(num);
 
 		updateOverlays();
+	}
+	
+	private void onMouseOver(FloatVisulaizationTile fvt) {
+		int alti = (int) altitudeSlider.getValue();
+		float cu = 0;
+		for (int a = 0; a < globeData.altitudeDivisions; a++) 
+			cu = Math.max(globeData.cloudCover[fvt.y][fvt.x][a], cu);
+		
+		debugTile.changeValue("Pos:", 			String.format("%d %d", fvt.x, fvt.y));
+		debugTile.changeValue("Latitude:", 		String.format("%7.4f°", fvt.y * -180d / globeData.latitudeDivisions +90));
+		debugTile.changeValue("Longitude:", 	String.format("%7.4f°", fvt.x * 360d / globeData.longitudeDivisions));
+		debugTile.changeValue("Elevation:", 	String.format("%5.1fm", globeData.elevation[fvt.y][fvt.x]));
+		debugTile.changeValue("Altitude:", 		String.format("%7.4f",  globeData.altitudeLowerBound(alti)));
+		debugTile.changeValue("Ground:", 		String.format("%s", GlobeData.GroundType.values()[globeData.groundType[fvt.y][fvt.x]]));
+		debugTile.changeValue("Snow:", 			String.format("%4.1fcm", globeData.snowCover[fvt.y][fvt.x]));
+		debugTile.changeValue("Temp:", 			String.format("%3.0f°F", globeData.temp[fvt.y][fvt.x][alti]));
+		debugTile.changeValue("Humidity:", 		String.format("%3.0f%%",   globeData.humidity[fvt.y][fvt.x][alti] * 100));
+		debugTile.changeValue("Cloud:", 		String.format("%3.0f%%",   globeData.cloudCover[fvt.y][fvt.x][alti] * 100));
+		debugTile.changeValue("Cloud Cover:", 	String.format("%3.0f%%",   cu * 100)); //not accounting for angle of sun
+		debugTile.changeValue("Wind:", 			String.format("%5.2f\n%5.2f\n%5.2f",   globeData.windSpeed[fvt.y][fvt.x][alti][0],globeData.windSpeed[fvt.y][fvt.x][alti][1],globeData.windSpeed[fvt.y][fvt.x][alti][2]));
+		debugTile.changeValue("Rain:", 			String.format("%3.0f%%S", globeData.percipitationChanceAt(fvt.y, fvt.x) * 100));
+		debugTile.changeValue("Pressure:", 		String.format("%4.3f",   globeData.pressure[fvt.y][fvt.x][alti]));
 	}
 }

@@ -26,12 +26,12 @@ public class LetsCudaFunctionaly {
 //		JCuda.cudaFree(pointer);
 		
 		// Enable exceptions and omit all subsequent error checks
-        init();
+        
 		
 		CUmodule module = loadModule("JCudaVectorAddKernal.ptx");
 		CUfunction func = getFunction(module, "add");
 		
-		int numElements = 1024;
+		int numElements = 1<<27;
 
         // Allocate and fill the host input data
         float hostInputA[] = new float[numElements];
@@ -55,15 +55,20 @@ public class LetsCudaFunctionaly {
 				Pointer.to(deviceOutput)
 		);
 		
+		double blocksNeeded = numElements/256d;
+		
+		int dimLimit = 65535;
+		int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+		
 		// Call the kernel function.
         int blockSizeX = 256;
         int gridSizeX = (int)Math.ceil((double)numElements / blockSizeX);
 		
-        System.out.printf("Block size x: %d\nGrid size x: %d\n", blockSizeX, gridSizeX);
+        System.out.printf("Block size x: %d\nGrid size x: %d\n", blockSizeX, dim);
         
 		JCudaDriver.cuLaunchKernel(func,       
 	//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
-		    gridSizeX,  1, 1,      // Grid dimension 
+		    dim,  dim, dim,      // Grid dimension 
 		    blockSizeX, 1, 1,      // Block dimension
 		    0, null,               // Shared memory size and stream 
 		    kernalParams, null // Kernel- and extra parameters

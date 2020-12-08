@@ -13,6 +13,10 @@ import app.util.Vector3f;
 import jcuda.driver.CUdeviceptr;
 
 public class GlobeData {
+	
+	/**Time is stored as {world rotation, world revolution}<br>
+	 * where {1,2} is 1 day after the second year*/
+	public final float[] time;
 	/**[Latitude][logitude][altitude]*/
 	public final float[][][] temp, humidity, cloudCover, pressure;
 	/**[Latitude][logitude][altitude]*/
@@ -31,10 +35,18 @@ public class GlobeData {
 	public static final float MAX_RAIN_CLOUD_HEIGHT_KM = 8;
 	public static final float EARTH_RADIUS_KM = 6371;
 	
+	
+	
+	/**
+	 * Example: 12587, 25174, 50
+	 * 5700, 2857,
+	 * longitude should be 2x latitude, 180 degrees vs 360
+	 * */
 	public GlobeData(int latitudeDivisions, int longitudeDivisions, int altitudeDivisions) {
 		this.latitudeDivisions = latitudeDivisions;
 		this.longitudeDivisions = longitudeDivisions;
 		this.altitudeDivisions = altitudeDivisions;
+		time = new float[] {0,0};
 		temp = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
 		pressure = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
 		humidity = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
@@ -44,6 +56,9 @@ public class GlobeData {
 		groundMoisture = new float[latitudeDivisions][longitudeDivisions];
 		groundType = new int[latitudeDivisions][longitudeDivisions];
 		elevation = new float[latitudeDivisions][longitudeDivisions];
+	}
+	public GlobeData(GlobeData copySize) {
+		this(copySize.latitudeDivisions, copySize.longitudeDivisions, copySize.altitudeDivisions);
 	}
 	
 	/**Return the lower bound for this altitude index*/
@@ -137,6 +152,11 @@ public class GlobeData {
 		return this;
 	}
 	
+	public String getTime(float longitude) {
+		StringBuilder out = new StringBuilder();
+		time[0]
+	}
+	
 	public GlobeData generateTerrain(long seed) {
 		return random(); //TODO
 	}
@@ -150,5 +170,17 @@ public class GlobeData {
 		ICE,
 		FOREST,
 		LAKE
+	}
+
+	public long groundCells() {
+		return latitudeDivisions * (long)longitudeDivisions;
+	}
+
+	public long totalCells() {
+		return groundCells() * altitudeDivisions;
+	}
+	
+	public static long byteSizeIf(int lon, int lat, int alt) {
+		return lon*lat*alt*9*4;
 	}
 }

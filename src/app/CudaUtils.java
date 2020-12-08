@@ -8,6 +8,7 @@ import static jcuda.driver.JCudaDriver.cuMemcpyDtoH;
 import static jcuda.driver.JCudaDriver.cuMemcpyHtoD;
 
 import app.util.Pair;
+import jcuda.LogLevel;
 import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUcontext;
@@ -18,18 +19,15 @@ import jcuda.driver.CUmodule;
 import jcuda.driver.JCudaDriver;
 
 public class CudaUtils {
-	private static boolean initalized = false;
 	private static CUdevice device;
 	private static CUcontext context;
 	
-	static {
-		init();
-	}
 	
-	private static void init() {
-		if(initalized) return;
+	
+	public static void init() {
 		
 		JCudaDriver.setExceptionsEnabled(true);
+		//JCudaDriver.setLogLevel(LogLevel.LOG_DEBUGTRACE);
 		cuInit(0);
         device = new CUdevice();
         cuDeviceGet(device, 0);
@@ -63,6 +61,21 @@ public class CudaUtils {
 	            data.length * Sizeof.FLOAT);
 	     return ptr;
 	}
+	public static void loadToGPU(CUdeviceptr ptr, float[] data) {
+		if(ptr==null) throw new NullPointerException("Missing pointer");
+		if(data==null) throw new NullPointerException("Missing data");
+		
+		cuMemcpyHtoD(ptr, Pointer.to(data),
+				data.length * Sizeof.FLOAT);
+	}
+	public static void loadToGPU(CUdeviceptr ptr, int[] data) {
+		if(ptr==null) throw new NullPointerException("Missing pointer");
+		if(data==null) throw new NullPointerException("Missing data");
+		
+		cuMemcpyHtoD(ptr, Pointer.to(data),
+				data.length * Sizeof.INT);
+	}
+	
 	public static CUdeviceptr loadToGPU(int[] data) {
 		 CUdeviceptr ptr = new CUdeviceptr();
 	     cuMemAlloc(ptr, data.length * Sizeof.INT);

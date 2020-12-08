@@ -17,7 +17,9 @@ public class FloatVisulaizationTile extends Pane {
 	boolean asColor = false;
 	Rectangle rect = new Rectangle();
 	Label label = new Label();
-	public FloatVisulaizationTile() {
+	int x, y;
+	public FloatVisulaizationTile(int x, int y) {
+		this.x = x; this.y = y;
 		rect.setWidth(32);
 		rect.setHeight(rect.getWidth());
 		rect.setFill(Color.TRANSPARENT);
@@ -60,6 +62,7 @@ public class FloatVisulaizationTile extends Pane {
 					case OCEAN -> Color.ROYALBLUE;
 					case SAND -> soilMoisture < .5? Color.BLANCHEDALMOND : Color.KHAKI;
 					case STONE -> soilMoisture < .5? Color.LIGHTGRAY : Color.SLATEGRAY;
+					case LAKE -> Color.AQUA;
 				} 
 				);
 	}

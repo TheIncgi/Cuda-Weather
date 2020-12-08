@@ -8,100 +8,161 @@ import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
+import jcuda.driver.JCudaDriver;
+
 import static app.CudaUtils.*;
 
 public class Simulator {
-	GlobeData in, out;
-	Consumer<GlobeData> onStepComplete;
-	private float[] worldTime;
+	GlobeData in;
+	Runnable onStepComplete, onResultReady;
 	
-	private CUfunction[] funcs;
+	float timeStepSizeSeconds          = 5;
+	float worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
+	float worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
+	private Pair<CUfunction, Boolean>[] funcs;
+	//constant
 	private CUdeviceptr worldSizePtr;
-	private CUdeviceptr worldTimePtr;
-	//private CUdeviceptr[][] argPointers; //kernal, ordinal
-	private CudaInt2[]   groundType;
-	private CudaFloat2[] groundMoisture, snowCover, elevation;
-	private CudaFloat3[] temperature, pressure, humidity, cloudCover;
-	private CudaFloat4[] windSpeed;
-	private Pointer[] kernalParams;
+	private CudaFloat1   worldSpeed; //not changed by CUfunction
+	private CudaFloat1[] worldTimePtr = new CudaFloat1[2];
+	private CudaInt2   groundType;
+	private CudaFloat2 elevation;    //not changed
+	private CudaFloat2[] groundMoisture = new CudaFloat2[2],
+			             snowCover      = new CudaFloat2[2];
+	private CudaFloat3[] temperature = new CudaFloat3[2], 
+			             pressure    = new CudaFloat3[2], 
+			             humidity    = new CudaFloat3[2], 
+			             cloudCover  = new CudaFloat3[2];
+	private CudaFloat4[] windSpeed = new CudaFloat4[2];
+	
+	private Pointer[] kernalParams = new Pointer[2];
 	private int activeKernal = 0;
 	private boolean dataLoaded = false;
 	
-	public Simulator(GlobeData world, float planetRot, float planetRev) {
+	public Simulator(GlobeData world) {
 		in = world;
+		//out = new GlobeData(in);
 		
 		CUmodule module = loadModule("WeatherSim.ptx");
-		funcs = new CUfunction[] {
-				getFunction(module, "identity")
+		System.out.println(module);
+		funcs = new Pair[] {
+				new Pair(getFunction(module, "copy"), true)
 		};
 		
-		worldSizePtr = loadToGPU( new int[] { //constant
-				world.latitudeDivisions, 
-				world.longitudeDivisions, 
-				world.altitudeDivisions
-		});
-		
-		
-		worldTime = new float[] {planetRot, planetRev};
-		worldTimePtr = new CUdeviceptr();
+		initPtrs();
 		
 		kernalParams = new Pointer[2];
 		
 		
-		CUdeviceptr[] paramsA = new CUdeviceptr[10];
-		CUdeviceptr[] paramsB = new CUdeviceptr[10];
+		Pointer[] paramsA = new Pointer[20];
+		Pointer[] paramsB = new Pointer[20];
 		int i = 0;
 		
-		paramsA[i] = paramsB[i++] = worldSizePtr;
+		//static
+		paramsA[i] = paramsB[i++] = Pointer.to(worldSizePtr);
+		paramsA[i] = paramsB[i++] = Pointer.to(worldSpeed.getThePointer());
+		paramsA[i] = paramsB[i++] = Pointer.to(elevation.getThePointer());
+		paramsA[i] = paramsB[i++] = Pointer.to(groundType.getThePointer());
+
+		//in
+		paramsA[i]   = Pointer.to(worldTimePtr[0].getThePointer());
+		paramsB[i++] = Pointer.to(worldTimePtr[1].getThePointer());
 		
-		paramsA[i] = paramsB[i++] = worldTimePtr;
+		paramsA[i]   = Pointer.to(groundMoisture[0].getThePointer());
+		paramsB[i++] = Pointer.to(groundMoisture[1].getThePointer());
 		
-		paramsA[i]   = groundType[0].getThePointer();
-		paramsB[i++] = groundType[1].getThePointer();
+		paramsA[i]   = Pointer.to(snowCover[0].getThePointer());
+		paramsB[i++] = Pointer.to(snowCover[1].getThePointer());
 		
-		paramsA[i]   = groundMoisture[0].getThePointer();
-		paramsB[i++] = groundMoisture[1].getThePointer();
+		paramsA[i]   = Pointer.to(temperature[0].getThePointer());
+		paramsB[i++] = Pointer.to(temperature[1].getThePointer());
 		
-		paramsA[i]   = snowCover[0].getThePointer();
-		paramsB[i++] = snowCover[1].getThePointer();
+		paramsA[i]   = Pointer.to(pressure[0].getThePointer());
+		paramsB[i++] = Pointer.to(pressure[1].getThePointer());
 		
-		paramsA[i]   = elevation[0].getThePointer();
-		paramsB[i++] = elevation[1].getThePointer();
+		paramsA[i]   = Pointer.to(humidity[0].getThePointer());
+		paramsB[i++] = Pointer.to(humidity[1].getThePointer());
 		
-		paramsA[i]   = temperature[0].getThePointer();
-		paramsB[i++] = temperature[1].getThePointer();
+		paramsA[i]   = Pointer.to(cloudCover[0].getThePointer());
+		paramsB[i++] = Pointer.to(cloudCover[1].getThePointer());
 		
-		paramsA[i]   = pressure[0].getThePointer();
-		paramsB[i++] = pressure[1].getThePointer();
+		paramsA[i]   = Pointer.to(windSpeed[0].getThePointer());
+		paramsB[i++] = Pointer.to(windSpeed[1].getThePointer());
 		
-		paramsA[i]   = humidity[0].getThePointer();
-		paramsB[i++] = humidity[1].getThePointer();
+		//out
+		paramsA[i]   = Pointer.to(worldTimePtr[1].getThePointer());
+		paramsB[i++] = Pointer.to(worldTimePtr[0].getThePointer());
 		
-		paramsA[i]   = cloudCover[0].getThePointer();
-		paramsB[i++] = cloudCover[1].getThePointer();
+		paramsA[i]   = Pointer.to(groundMoisture[1].getThePointer());
+		paramsB[i++] = Pointer.to(groundMoisture[0].getThePointer());
 		
-		paramsA[i]   = windSpeed[0].getThePointer();
-		paramsB[i++] = windSpeed[1].getThePointer();
+		paramsA[i]   = Pointer.to(snowCover[1].getThePointer());
+		paramsB[i++] = Pointer.to(snowCover[0].getThePointer());
+				
+		paramsA[i]   = Pointer.to(temperature[1].getThePointer());
+		paramsB[i++] = Pointer.to(temperature[0].getThePointer());
 		
+		paramsA[i]   = Pointer.to(pressure[1].getThePointer());
+		paramsB[i++] = Pointer.to(pressure[0].getThePointer());
 		
-//		for(int i =0; i<argPointers[0].length; i++) {
-//			paramsA[2+i] = argPointers[0][i];
-//			paramsB[2+i] = argPointers[1][i];
-//		}
+		paramsA[i]   = Pointer.to(humidity[1].getThePointer());
+		paramsB[i++] = Pointer.to(humidity[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(cloudCover[1].getThePointer());
+		paramsB[i++] = Pointer.to(cloudCover[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(windSpeed[1].getThePointer());
+		paramsB[i++] = Pointer.to(windSpeed[0].getThePointer());
+		
+
 		
 		kernalParams[0] = Pointer.to(paramsA);
 		kernalParams[1] = Pointer.to(paramsB);
 		
 	}
 	
+	private void initPtrs() {
+		worldSizePtr = loadToGPU( new int[] { //constant
+				in.latitudeDivisions, 
+				in.longitudeDivisions, 
+				in.altitudeDivisions
+		});
+		worldSpeed = new CudaFloat1(3);
+		elevation = new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
+		groundType = new CudaInt2(in.latitudeDivisions, in.longitudeDivisions);
+		
+		worldTimePtr 		= new CudaFloat1[] { new CudaFloat1(2), new CudaFloat1(2) };
+		groundMoisture[0] 	= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
+		groundMoisture[1] 	= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
+		snowCover[0] 		= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
+		snowCover[1] 		= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
+		temperature[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		temperature[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		pressure[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		pressure[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		humidity[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		humidity[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		cloudCover[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		cloudCover[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
+		windSpeed[0] 		= new CudaFloat4(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions, 3);
+		windSpeed[1] 		= new CudaFloat4(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions, 3);
+		
+	}
+
 	/**
 	 * Loads input globe data into active param pointers
 	 * */
-	private void pushData() {
-		groundType		[activeKernal].push( in.groundType		);
+	private synchronized void pushData() {
+		worldSpeed                    .push(new float[] {
+										worldRotationRatePerStep, 
+										worldRevolutionRatePerStep,
+										timeStepSizeSeconds
+		});
+		elevation		              .push( in.elevation		);
+		groundType		              .push( in.groundType		);
+		worldTimePtr    [activeKernal].pull( in.time            );
 		groundMoisture	[activeKernal].push( in.groundMoisture  );
 		snowCover		[activeKernal].push( in.snowCover		);
-		elevation		[activeKernal].push( in.elevation		);
+		
 		temperature		[activeKernal].push( in.temp			);
 		pressure		[activeKernal].push( in.pressure		);
 		humidity		[activeKernal].push( in.humidity		);
@@ -110,18 +171,32 @@ public class Simulator {
 	}
 	
 	private void pullResult() {
-		groundType		[1-activeKernal].pull( out.groundType		);
-		groundMoisture	[1-activeKernal].pull( out.groundMoisture   );
-		snowCover		[1-activeKernal].pull( out.snowCover		);
-		elevation		[1-activeKernal].pull( out.elevation		);
-		temperature		[1-activeKernal].pull( out.temp				);
-		pressure		[1-activeKernal].pull( out.pressure			);
-		humidity		[1-activeKernal].pull( out.humidity			);
-		cloudCover		[1-activeKernal].pull( out.cloudCover		);
-		windSpeed		[1-activeKernal].pull( out.windSpeed		);
+		worldTimePtr    [1-activeKernal].pull( in.time             );
+		groundMoisture	[1-activeKernal].pull( in.groundMoisture   );
+		snowCover		[1-activeKernal].pull( in.snowCover		);
+		temperature		[1-activeKernal].pull( in.temp				);
+		pressure		[1-activeKernal].pull( in.pressure			);
+		humidity		[1-activeKernal].pull( in.humidity			);
+		cloudCover		[1-activeKernal].pull( in.cloudCover		);
+		windSpeed		[1-activeKernal].pull( in.windSpeed		);
 	}
 	
-	public void timeStep() {
+	public synchronized void setWorldSpeed(float secondsPerTimeStep, float hoursInDay, float daysInYear) {
+		timeStepSizeSeconds          = 5;
+		worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
+		worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
+		worldSpeed                    .push(new float[] {
+				worldRotationRatePerStep, 
+				worldRevolutionRatePerStep
+		});
+	}
+	
+	/**Begins calculation of next timestep<br>
+	 * Results will be ready before this emthod unblocks
+	 * returns number of milliseconds elapsed
+	 * */
+	public synchronized long timeStep() {
+		long start = System.currentTimeMillis();
 		if(!dataLoaded) {
 			pushData();
 			dataLoaded = true;
@@ -137,14 +212,55 @@ public class Simulator {
 		//rainfall
 		//water accumulation -> lakes/rivers
 		//terrain alterations? dry: grass->desert,  warm: ice->water
+		int blockSizeX = 256;
+		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
+		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
+		for (Pair<CUfunction, Boolean> step : funcs) {
+			CUfunction f = step.a;
+			double blocksNeeded = step.b? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
+			
+			int dimLimit = 65535;
+			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+			if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+			JCudaDriver.cuLaunchKernel(f,       
+				//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
+			    dim,  dim, dim,      // Grid dimension 
+			    blockSizeX, 1, 1,      // Block dimension
+			    0, null,               // Shared memory size and stream 
+			    kernal, null // Kernel- and extra parameters
+			); 
+			pullResult(); //read from input side while also computing
+			onResultReady.run();
+			JCudaDriver.cuCtxSynchronize();
+		}
 		
 		
+		activeKernal = 1-activeKernal;
+		
+		if(onStepComplete!=null)
+			onStepComplete.run();
+		long end = System.currentTimeMillis();
+		return end-start;
 	}
 	
-	public void setOnStepComplete(Consumer<GlobeData> onStepComplete) {
+	/**
+	 * Called when the timestep has completed computation for the next result<br>
+	 * if waiting for a result, instead use onResultReady
+	 * */
+	public void setOnStepComplete(Runnable onStepComplete) {
 		this.onStepComplete = onStepComplete;
 	}
-	
+	/**
+	 * Called when the result from the timestep is available<br>
+	 * This may be triggered while the next timestep is being calculated
+	 * */
+	public void setOnResultReady(Runnable onResultReady) {
+		this.onResultReady = onResultReady;
+	}
+	/**It's really the current input, but the old output becomes the new input*/
+	public GlobeData getStepResult() {
+		return in;
+	}
 	
 	/*
 	 * init:

@@ -51,5 +51,6 @@
 	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-apple-x86_64.jar"/>
 	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-linux-x86_64.jar"/>
 	<classpathentry kind="lib" path="JCuda-All-10.1.0/jnvgraph-natives-10.1.0-windows-x86_64.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
