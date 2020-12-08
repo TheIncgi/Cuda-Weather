@@ -132,7 +132,7 @@ public class GlobeViewer extends BorderPane{
 	}
 
 	public void updateOverlays() {
-		debug.setText(String.format("World time: \n%8.4f\n%8.4f", globeData.time[0], globeData.time[1]));
+		debug.setText(String.format("World time: \n%8.4f\n%8.4f\n%s", globeData.time[0], globeData.time[1], globeData.getTime(0)));
 		
 		int altitude = (int) altitudeSlider.getValue();
 		float mixup = (float) (altitudeSlider.getValue() % 1);

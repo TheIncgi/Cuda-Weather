@@ -26,6 +26,8 @@ public class GlobeData {
 	/**[Latitude][logitude]*/
 	public final int[][] groundType;
 	
+	public final float worldTilt = 23.5;
+	
 	public final int latitudeDivisions;
 	public final int longitudeDivisions;
 	public final int altitudeDivisions;
@@ -153,8 +155,22 @@ public class GlobeData {
 	}
 	
 	public String getTime(float longitude) {
-		StringBuilder out = new StringBuilder();
-		time[0]
+		float x = (time[0] + MathUtils.clamp(longitude, 0, 360)/360) * 24 * 60 ;
+		int min  = (int) x % 60;
+		x-= min;
+		x /= 60;
+		int hour = (int) x % 24;
+		x-= hour;
+		x/=24;
+		boolean isAM = hour < 12;
+		hour -= isAM? 0 : 12;
+		int day = (int) x;
+		
+		float ofYear = time[1] % 1;
+		int year = (int) time[1];
+		
+		if(hour==0) hour = 12;
+		return String.format("%2d:%02d %s, Day: %d (%4.1f%%) Year: ", hour, min, isAM?"AM":"PM", day, ofYear, year);
 	}
 	
 	public GlobeData generateTerrain(long seed) {
