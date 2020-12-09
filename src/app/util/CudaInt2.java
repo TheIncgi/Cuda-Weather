@@ -40,6 +40,10 @@ public class CudaInt2 implements Closeable{
 		return thePointer;
 	}
 	
+	public Pointer getArgPointer() {
+		return Pointer.to(thePointer);
+	}
+	
 	@Override
 	public void close() throws IOException {
 		for (int i = 0; i < pointerArray.length; i++) {

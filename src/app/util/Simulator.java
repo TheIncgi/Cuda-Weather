@@ -19,7 +19,7 @@ public class Simulator {
 	float timeStepSizeSeconds          = 5;
 	float worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
 	float worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
-	private Pair<CUfunction, Boolean>[] funcs;
+	private Triplet<CUfunction, Boolean, Pointer[]>[] funcs;
 	//constant
 	private CUdeviceptr worldSizePtr;
 	private CudaFloat1   worldSpeed; //not changed by CUfunction
@@ -34,92 +34,53 @@ public class Simulator {
 			             cloudCover  = new CudaFloat3[2];
 	private CudaFloat4[] windSpeed = new CudaFloat4[2];
 	
-	private Pointer[] kernalParams = new Pointer[2];
+	//private Pointer[] kernalParams = new Pointer[2];
 	private int activeKernal = 0;
 	private boolean dataLoaded = false;
 	
 	public Simulator(GlobeData world) {
 		in = world;
 		//out = new GlobeData(in);
-		
-		CUmodule module = loadModule("WeatherSim.ptx");
-		System.out.println(module);
-		funcs = new Pair[] {
-				new Pair(getFunction(module, "copy"), true)
-		};
-		
 		initPtrs();
 		
-		kernalParams = new Pointer[2];
-		
-		
-		Pointer[] paramsA = new Pointer[20];
-		Pointer[] paramsB = new Pointer[20];
-		int i = 0;
-		
-		//static
-		paramsA[i] = paramsB[i++] = Pointer.to(worldSizePtr);
-		paramsA[i] = paramsB[i++] = Pointer.to(worldSpeed.getThePointer());
-		paramsA[i] = paramsB[i++] = Pointer.to(elevation.getThePointer());
-		paramsA[i] = paramsB[i++] = Pointer.to(groundType.getThePointer());
-
-		//in
-		paramsA[i]   = Pointer.to(worldTimePtr[0].getThePointer());
-		paramsB[i++] = Pointer.to(worldTimePtr[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(groundMoisture[0].getThePointer());
-		paramsB[i++] = Pointer.to(groundMoisture[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(snowCover[0].getThePointer());
-		paramsB[i++] = Pointer.to(snowCover[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(temperature[0].getThePointer());
-		paramsB[i++] = Pointer.to(temperature[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(pressure[0].getThePointer());
-		paramsB[i++] = Pointer.to(pressure[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(humidity[0].getThePointer());
-		paramsB[i++] = Pointer.to(humidity[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(cloudCover[0].getThePointer());
-		paramsB[i++] = Pointer.to(cloudCover[1].getThePointer());
-		
-		paramsA[i]   = Pointer.to(windSpeed[0].getThePointer());
-		paramsB[i++] = Pointer.to(windSpeed[1].getThePointer());
-		
-		//out
-		paramsA[i]   = Pointer.to(worldTimePtr[1].getThePointer());
-		paramsB[i++] = Pointer.to(worldTimePtr[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(groundMoisture[1].getThePointer());
-		paramsB[i++] = Pointer.to(groundMoisture[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(snowCover[1].getThePointer());
-		paramsB[i++] = Pointer.to(snowCover[0].getThePointer());
-				
-		paramsA[i]   = Pointer.to(temperature[1].getThePointer());
-		paramsB[i++] = Pointer.to(temperature[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(pressure[1].getThePointer());
-		paramsB[i++] = Pointer.to(pressure[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(humidity[1].getThePointer());
-		paramsB[i++] = Pointer.to(humidity[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(cloudCover[1].getThePointer());
-		paramsB[i++] = Pointer.to(cloudCover[0].getThePointer());
-		
-		paramsA[i]   = Pointer.to(windSpeed[1].getThePointer());
-		paramsB[i++] = Pointer.to(windSpeed[0].getThePointer());
-		
-
-		
-		kernalParams[0] = Pointer.to(paramsA);
-		kernalParams[1] = Pointer.to(paramsB);
-		
+		setupFuncs();
 	}
 	
+	@SuppressWarnings("unchecked")
+	private void setupFuncs() {
+		CUmodule module = loadModule("WeatherSim.ptx");
+		Pointer worldSize = Pointer.to(worldSizePtr);
+		funcs = new Triplet[] {
+				new Triplet<>(getFunction(module, "calcWind"), true, new Pointer[] {
+					Pointer.to(new Pointer[] {
+							worldSize,
+							worldSpeed.getArgPointer(),
+							elevation.getArgPointer(),
+							worldTimePtr[0].getArgPointer(),
+							pressure[0].getArgPointer(),
+							windSpeed[0].getArgPointer(),
+							temperature[0].getArgPointer(),
+							humidity[0].getArgPointer(),
+							
+							worldTimePtr[1].getArgPointer(),
+							windSpeed[1].getArgPointer(),
+					}),Pointer.to(new Pointer[] {
+							worldSize,
+							worldSpeed.getArgPointer(),
+							elevation.getArgPointer(),
+							worldTimePtr[1].getArgPointer(),
+							pressure[1].getArgPointer(),
+							windSpeed[1].getArgPointer(),
+							temperature[1].getArgPointer(),
+							humidity[1].getArgPointer(),
+							
+							worldTimePtr[0].getArgPointer(),
+							windSpeed[0].getArgPointer(),
+					})
+				})
+		};
+	}
+
 	private void initPtrs() {
 		worldSizePtr = loadToGPU( new int[] { //constant
 				in.latitudeDivisions, 
@@ -201,7 +162,6 @@ public class Simulator {
 			pushData();
 			dataLoaded = true;
 		}
-		Pointer kernal = kernalParams[activeKernal];
 		
 		//sun warming
 		//infrared radiative cooling
@@ -215,7 +175,7 @@ public class Simulator {
 		int blockSizeX = 256;
 		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
 		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
-		for (Pair<CUfunction, Boolean> step : funcs) {
+		for (Triplet<CUfunction, Boolean, Pointer[]> step : funcs) {
 			CUfunction f = step.a;
 			double blocksNeeded = step.b? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
 			
@@ -227,7 +187,7 @@ public class Simulator {
 			    dim,  dim, dim,      // Grid dimension 
 			    blockSizeX, 1, 1,      // Block dimension
 			    0, null,               // Shared memory size and stream 
-			    kernal, null // Kernel- and extra parameters
+			    step.c[activeKernal], null // Kernel- and extra parameters
 			); 
 			pullResult(); //read from input side while also computing
 			onResultReady.run();
@@ -275,5 +235,66 @@ public class Simulator {
 	 * 
 	 * while results are read to the application they can also be used to calculate
 	 * the next state
+	 * 
+	 * 
+	 * Pointer[] paramsA = new Pointer[20];
+		Pointer[] paramsB = new Pointer[20];
+		int i = 0;
+		
+		//static
+		paramsA[i] = paramsB[i++] = Pointer.to(worldSizePtr);
+		paramsA[i] = paramsB[i++] = Pointer.to(worldSpeed.getThePointer());
+		paramsA[i] = paramsB[i++] = Pointer.to(elevation.getThePointer());
+		paramsA[i] = paramsB[i++] = Pointer.to(groundType.getThePointer());
+
+		//in
+		paramsA[i]   = Pointer.to(worldTimePtr[0].getThePointer());
+		paramsB[i++] = Pointer.to(worldTimePtr[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(groundMoisture[0].getThePointer());
+		paramsB[i++] = Pointer.to(groundMoisture[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(snowCover[0].getThePointer());
+		paramsB[i++] = Pointer.to(snowCover[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(temperature[0].getThePointer());
+		paramsB[i++] = Pointer.to(temperature[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(pressure[0].getThePointer());
+		paramsB[i++] = Pointer.to(pressure[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(humidity[0].getThePointer());
+		paramsB[i++] = Pointer.to(humidity[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(cloudCover[0].getThePointer());
+		paramsB[i++] = Pointer.to(cloudCover[1].getThePointer());
+		
+		paramsA[i]   = Pointer.to(windSpeed[0].getThePointer());
+		paramsB[i++] = Pointer.to(windSpeed[1].getThePointer());
+		
+		//out
+		paramsA[i]   = Pointer.to(worldTimePtr[1].getThePointer());
+		paramsB[i++] = Pointer.to(worldTimePtr[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(groundMoisture[1].getThePointer());
+		paramsB[i++] = Pointer.to(groundMoisture[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(snowCover[1].getThePointer());
+		paramsB[i++] = Pointer.to(snowCover[0].getThePointer());
+				
+		paramsA[i]   = Pointer.to(temperature[1].getThePointer());
+		paramsB[i++] = Pointer.to(temperature[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(pressure[1].getThePointer());
+		paramsB[i++] = Pointer.to(pressure[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(humidity[1].getThePointer());
+		paramsB[i++] = Pointer.to(humidity[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(cloudCover[1].getThePointer());
+		paramsB[i++] = Pointer.to(cloudCover[0].getThePointer());
+		
+		paramsA[i]   = Pointer.to(windSpeed[1].getThePointer());
+		paramsB[i++] = Pointer.to(windSpeed[0].getThePointer());
 	*/
 }

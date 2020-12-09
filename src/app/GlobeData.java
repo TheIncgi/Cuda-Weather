@@ -26,7 +26,7 @@ public class GlobeData {
 	/**[Latitude][logitude]*/
 	public final int[][] groundType;
 	
-	public final float worldTilt = 23.5;
+	public final float worldTilt = 23.5f;
 	
 	public final int latitudeDivisions;
 	public final int longitudeDivisions;

@@ -31,6 +31,10 @@ public class CudaFloat1 implements Closeable{
 		return thePointer;
 	}
 	
+	public Pointer getArgPointer() {
+		return Pointer.to(thePointer);
+	}
+	
 	@Override
 	public void close() throws IOException {
 		JCudaDriver.cuMemFree(thePointer);
