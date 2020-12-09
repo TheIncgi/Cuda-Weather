@@ -51,31 +51,78 @@ public class Simulator {
 		CUmodule module = loadModule("WeatherSim.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
 		funcs = new Triplet[] {
+				new Triplet<>(getFunction(module, "copy"), true, new Pointer[] {
+						Pointer.to(
+							worldSize,
+							worldSpeed       .getArgPointer(),
+							elevation        .getArgPointer(),
+							groundType       .getArgPointer(),
+							worldTimePtr  [0].getArgPointer(),
+							groundMoisture[0].getArgPointer(),
+							snowCover     [0].getArgPointer(),
+							temperature   [0].getArgPointer(),
+							pressure      [0].getArgPointer(),
+							humidity      [0].getArgPointer(),
+							cloudCover    [0].getArgPointer(),
+							windSpeed     [0].getArgPointer(),
+							worldTimePtr  [1].getArgPointer(),
+							groundMoisture[1].getArgPointer(),
+							snowCover     [1].getArgPointer(),
+							temperature   [1].getArgPointer(),
+							pressure      [1].getArgPointer(),
+							humidity      [1].getArgPointer(),
+							cloudCover    [1].getArgPointer(),
+							windSpeed     [1].getArgPointer()
+						),Pointer.to(
+								worldSize,
+								worldSpeed       .getArgPointer(),
+								elevation        .getArgPointer(),
+								groundType       .getArgPointer(),
+								worldTimePtr  [1].getArgPointer(),
+								groundMoisture[1].getArgPointer(),
+								snowCover     [1].getArgPointer(),
+								temperature   [1].getArgPointer(),
+								pressure      [1].getArgPointer(),
+								humidity      [1].getArgPointer(),
+								cloudCover    [1].getArgPointer(),
+								windSpeed     [1].getArgPointer(),
+								worldTimePtr  [0].getArgPointer(),
+								groundMoisture[0].getArgPointer(),
+								snowCover     [0].getArgPointer(),
+								temperature   [0].getArgPointer(),
+								pressure      [0].getArgPointer(),
+								humidity      [0].getArgPointer(),
+								cloudCover    [0].getArgPointer(),
+								windSpeed     [0].getArgPointer()
+								)
+				}),
 				new Triplet<>(getFunction(module, "calcWind"), true, new Pointer[] {
 					Pointer.to(new Pointer[] {
 							worldSize,
-							worldSpeed.getArgPointer(),
-							elevation.getArgPointer(),
+							worldSpeed     .getArgPointer(),
+							elevation      .getArgPointer(),
+							
 							worldTimePtr[0].getArgPointer(),
-							pressure[0].getArgPointer(),
-							windSpeed[0].getArgPointer(),
-							temperature[0].getArgPointer(),
-							humidity[0].getArgPointer(),
+							temperature [0].getArgPointer(),
+							pressure    [0].getArgPointer(),
+							humidity    [0].getArgPointer(),
+							windSpeed   [0].getArgPointer(),
 							
 							worldTimePtr[1].getArgPointer(),
-							windSpeed[1].getArgPointer(),
+							windSpeed   [1].getArgPointer()
 					}),Pointer.to(new Pointer[] {
 							worldSize,
 							worldSpeed.getArgPointer(),
 							elevation.getArgPointer(),
+							
 							worldTimePtr[1].getArgPointer(),
-							pressure[1].getArgPointer(),
-							windSpeed[1].getArgPointer(),
-							temperature[1].getArgPointer(),
-							humidity[1].getArgPointer(),
+							temperature [1].getArgPointer(),
+							pressure    [1].getArgPointer(),
+							humidity    [1].getArgPointer(),
+							windSpeed   [1].getArgPointer(),
 							
 							worldTimePtr[0].getArgPointer(),
-							windSpeed[0].getArgPointer(),
+							windSpeed   [0].getArgPointer()
 					})
 				})
 		};
@@ -120,7 +167,7 @@ public class Simulator {
 		});
 		elevation		              .push( in.elevation		);
 		groundType		              .push( in.groundType		);
-		worldTimePtr    [activeKernal].pull( in.time            );
+		worldTimePtr    [activeKernal].push( in.time            );
 		groundMoisture	[activeKernal].push( in.groundMoisture  );
 		snowCover		[activeKernal].push( in.snowCover		);
 		
@@ -189,11 +236,12 @@ public class Simulator {
 			    0, null,               // Shared memory size and stream 
 			    step.c[activeKernal], null // Kernel- and extra parameters
 			); 
-			pullResult(); //read from input side while also computing
-			onResultReady.run();
+			
 			JCudaDriver.cuCtxSynchronize();
+			
 		}
-		
+		pullResult(); //read from input side while also computing
+		onResultReady.run();
 		
 		activeKernal = 1-activeKernal;
 		

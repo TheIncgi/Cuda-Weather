@@ -1,16 +1,7 @@
 @echo off
 
-goto %1
+echo compiling %1.cu ****************
 
-:vectorAdd
-echo ********* Vector Add ********
-nvcc -ptx JCudaVectorAddKernal.cu -o JCudaVectorAddKernal.ptx
-goto exit
+nvcc -ptx %1.cu -o %1.ptx
 
-
-
-:weatherSim
-echo ********* Weather Sim ********
-nvcc -ptx WeatherSim.cu -o WeatherSim.ptx
-
-:exit
+echo Done!

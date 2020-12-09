@@ -79,8 +79,8 @@ __device__ float distance(vec3 a, vec3 b){
 }
 
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude){
-	float yaw = (float) (360 * longitude / worldSize[1]);
-	float pitch = (float) (180 * latitude / worldSize[0]);
+	float yaw = (float) (360.0 * longitude / worldSize[1]);
+	float pitch = (float) (180.0 * latitude / worldSize[0]);
 	vec3 p = {6371 + altitudeOfIndex(altitude, worldSize), 0, 0};
 	rotateVec3AboutY(p, pitch * HALF_C);
 	rotVec3AboutZ(p, yaw * HALF_C);
@@ -124,11 +124,11 @@ __device__ float maxWaterHeld(float temp){
 
 
 __device__ float airMass(float kmCubed, float temp, float relHumid){
-	float mass = airDensity(tempF) * kmCubed; //mass of air
+	float mass = airDensity(temp) * kmCubed; //mass of air
 	//1 billion cubic meters in 1 cubic km
 	//divide 1000 because maxWater is returned in grams
 	//operations cancled out to * 1M
-	mass += maxWaterHeld(temp) 1'000'000 * min(relHumid,1)  * kmCubed; //mass of water in form of clouds
+	mass += maxWaterHeld(temp) * 1'000'000 * (relHumid>1?1:relHumid)  * kmCubed; //mass of water in form of clouds
 	return mass;
 }
 
@@ -181,7 +181,7 @@ __global__ void copy(
     		snowCoverOut[pos.x][pos.y]      = snowCoverIn[pos.x][pos.y];
     	}
         temperatureOut[pos.x][pos.y][pos.z] = temperatureIn[pos.x][pos.y][pos.z];
-        pressureOut[pos.x][pos.y][pos.z]    = temperatureIn[pos.x][pos.y][pos.z];
+        pressureOut[pos.x][pos.y][pos.z]    = pressureIn[pos.x][pos.y][pos.z];
         humidityOut[pos.x][pos.y][pos.z]    = humidityIn[pos.x][pos.y][pos.z];
         cloudCoverOut[pos.x][pos.y][pos.z]  = cloudCoverIn[pos.x][pos.y][pos.z];
         windSpeedOut[pos.x][pos.y][pos.z][0]   = windSpeedIn[pos.x][pos.y][pos.z][0];
@@ -199,21 +199,23 @@ __global__ void calcWind(
 		float*   worldTimeIn,   float*** temperatureIn,     float*** pressureIn,        float*** humidityIn,
 		float**** windSpeedIn,
 		//outputs
-		float*   worldTimeOut, 	float**** windSpeedOut
+		float*   worldTimeOut, float**** windSpeedOut
 	) { //end of args...
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
-	dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
+
 	if (i<n) {
-		if(i==0){
-			worldTimeOut[0] += worldSpeed[0];
-			worldTimeOut[1] += worldSpeed[1];
-		}
+		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
+//		if(i==0){
+//			worldTimeOut[0] = worldTimeIn[0] + worldSpeed[0];
+//			worldTimeOut[1] = worldTimeIn[1] + worldSpeed[1];
+//		}
 		//temperatureIn[pos.x][pos.y][pos.z];
 		//temperatureIn[pos.x][pos.y][pos.z];
 		//humidityIn[pos.x][pos.y][pos.z];
+		float  curVol  = volumeAt(worldSize, pos.x, pos.z);
 		float  curPres = pressureIn[pos.x][pos.y][pos.z];
-		float* curWind = windSpeedIn[pos.x][pos.y][pos.z];
+		//float* curWind = windSpeedIn[pos.x][pos.y][pos.z];
 		float  curTemp  = temperatureIn[pos.x][pos.y][pos.z];
 		float  curHumid = humidityIn[pos.x][pos.y][pos.z];
 
@@ -221,7 +223,7 @@ __global__ void calcWind(
 		for(int dlat = -1; dlat<=1; dlat++){
 			for(int dlon = -1; dlon<=1; dlon++){
 				for(int dalt = -1; dalt<=1; dalt++){
-					int manhtDist = abs(dlat)+abs(dlon)+abs(dalt)
+					int manhtDist = abs(dlat)+abs(dlon)+abs(dalt);
 					if(manhtDist==0) continue;
 
 					int al = pos.z+dalt;
@@ -237,24 +239,34 @@ __global__ void calcWind(
 						lo = (lo + worldSize[1] / 2) % worldSize[1];
 						la = worldSize[0]-(la-worldSize[0]+1);
 					}
+					la = (la + worldSize[0]) % worldSize[0];
+					lo = (lo + worldSize[1]) % worldSize[1];
 
-					float f = manhtDist==1? 1 :
+					float distanceFactor = manhtDist==1? 1 :
 							 (manhtDist==2? sqrt2 : sqrt3);
 
-					float otherPres = pressureIn[la][lo][al];
-					float otherWind = windSpeed[la][lo][al];
-					float otherTemp = temperatureIn[la][lo][al];
-					float otherHumid= humidityIn[la][lo][al];
+					float presDiff = curPres - pressureIn[la][lo][al];
+					float volFactor = curVol / volumeAt(worldSize, la, al);
+					float tempDiff = curTemp - temperatureIn[la][lo][al];
 
-
+					float forceMag = presDiff * volFactor * worldSpeed[2];
+					forceMag /= distanceFactor;
+					target.x += la * forceMag;
+					target.y += lo * forceMag;
+					target.z += al * forceMag + tempDiff * worldSpeed[2];//warm air above
 					//TODO forces from other pushing / pulling pressures
 					//pressure at altitudes
+					//ground type friction
 
 				}
 			}
 		}
-		windSpeedOut[pos.x][pos.y][pos.z][0]   = windSpeedIn[pos.x][pos.y][pos.z][0];
-		windSpeedOut[pos.x][pos.y][pos.z][1]   = windSpeedIn[pos.x][pos.y][pos.z][1];
-		windSpeedOut[pos.x][pos.y][pos.z][2]   = windSpeedIn[pos.x][pos.y][pos.z][2];
+		float mass = airMass(curVol, curTemp, curHumid);
+		//f = ma
+		//a = f/m
+
+		windSpeedOut[pos.x][pos.y][pos.z][0] = mass;//windSpeedIn[pos.x][pos.y][pos.z][0] + target.x / mass;
+		windSpeedOut[pos.x][pos.y][pos.z][1] = target.y;//windSpeedIn[pos.x][pos.y][pos.z][1] + target.y / mass;
+		windSpeedOut[pos.x][pos.y][pos.z][2] = windSpeedIn[pos.x][pos.y][pos.z][2] + target.z / mass;
 	}
 }

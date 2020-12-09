@@ -8,7 +8,7 @@ import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.JCudaDriver;
 
-public class CudaFloat1 implements Closeable{
+public class CudaFloat1 implements AutoCloseable{
 	private CUdeviceptr thePointer;
 	private final int dim1;
 	
@@ -36,7 +36,7 @@ public class CudaFloat1 implements Closeable{
 	}
 	
 	@Override
-	public void close() throws IOException {
+	public void close() {
 		JCudaDriver.cuMemFree(thePointer);
 	}
 }

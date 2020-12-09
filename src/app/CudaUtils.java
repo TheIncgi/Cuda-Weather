@@ -21,11 +21,15 @@ import jcuda.driver.JCudaDriver;
 public class CudaUtils {
 	private static CUdevice device;
 	private static CUcontext context;
-	
+	private static boolean init = false;
 	
 	
 	public static void init() {
-		
+		if(init) {
+			JCudaDriver.cuCtxSetCurrent(context);
+			return;
+		}
+		init = true;
 		JCudaDriver.setExceptionsEnabled(true);
 		//JCudaDriver.setLogLevel(LogLevel.LOG_DEBUGTRACE);
 		cuInit(0);

@@ -142,10 +142,10 @@ public class GlobeData {
 					temp[lat][lon][al] = r.nextFloat()*95;
 					humidity[lat][lon][al] = r.nextFloat();
 					cloudCover[lat][lon][al] = r.nextFloat()>.5? r.nextFloat() : 0;
-					pressure[lat][lon][al] = r.nextFloat()+1;
-					windSpeed[lat][lon][al][0] = r.nextFloat()*r.nextFloat()*110 -55 ;
-					windSpeed[lat][lon][al][1] = r.nextFloat()*r.nextFloat()*110 -55;
-					windSpeed[lat][lon][al][2] = r.nextFloat()*r.nextFloat()*10 -5;
+					pressure[lat][lon][al] = (r.nextFloat()-.5f)*.2f+1;
+					windSpeed[lat][lon][al][0] = r.nextFloat()*r.nextFloat()*.1f -.05f ;
+					windSpeed[lat][lon][al][1] = r.nextFloat()*r.nextFloat()*.1f -.05f;
+					windSpeed[lat][lon][al][2] = r.nextFloat()*r.nextFloat()*.05f -.025f;
 					
 					
 				}
@@ -197,6 +197,6 @@ public class GlobeData {
 	}
 	
 	public static long byteSizeIf(int lon, int lat, int alt) {
-		return lon*lat*alt*9*4;
+		return ((long)lon)*lat*alt*9*4;
 	}
 }

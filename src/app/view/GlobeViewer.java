@@ -175,7 +175,7 @@ public class GlobeViewer extends BorderPane{
 					}
 				if(pressure.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(pressure.isVisible()) {
-						fvt.setPercentColor(globeData.pressure[lat][lon][altitude]/3);
+						fvt.setPercentColor(globeData.pressure[lat][lon][altitude]/1.2f);
 					}
 
 			}
