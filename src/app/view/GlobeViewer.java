@@ -25,6 +25,7 @@ public class GlobeViewer extends BorderPane{
 	private static final float OVERLAY_OPACITY = .6f;
 
 	HashedGridPane terainGrid = new HashedGridPane("terrain"), 
+			elevGrid = new HashedGridPane("elevation"), 
 			tempGrid = new HashedGridPane("temp"), 
 			humidityGrid = new HashedGridPane("humid"), 
 			cloudCoverGridAlti = new HashedGridPane("cloudAlt"), 
@@ -36,7 +37,7 @@ public class GlobeViewer extends BorderPane{
 
 	ComboBox<String> colorOverlay = new ComboBox<>(), numberOverlay = new ComboBox<>();
 	CheckBox showSnow = new CheckBox("Show Snow");
-	Slider altitudeSlider;
+	Slider altitudeSlider, zoomSlider;
 	ToolBar layerModes = new ToolBar();
 	private GlobeData globeData;
 	Label debug = new Label("debug");
@@ -48,6 +49,7 @@ public class GlobeViewer extends BorderPane{
 		for(int la=0; la<gd.latitudeDivisions; la++)
 			for(int lo=0; lo<gd.longitudeDivisions; lo++) {
 				FloatVisulaizationTile terain = new FloatVisulaizationTile(lo, la);
+				FloatVisulaizationTile elev = new FloatVisulaizationTile(lo, la);
 				FloatVisulaizationTile temp = new FloatVisulaizationTile(lo, la);
 				FloatVisulaizationTile humid = new FloatVisulaizationTile(lo, la);
 				FloatVisulaizationTile cloud = new FloatVisulaizationTile(lo, la);
@@ -58,6 +60,7 @@ public class GlobeViewer extends BorderPane{
 				FloatVisulaizationTile pres = new FloatVisulaizationTile(lo, la);
 
 				temp.setOpacity(OVERLAY_OPACITY);
+				elev.setOpacity(OVERLAY_OPACITY + (1-OVERLAY_OPACITY)/2);
 				humid.setOpacity(OVERLAY_OPACITY);
 				cloud.setOpacity(OVERLAY_OPACITY);
 				cloud2.setOpacity(OVERLAY_OPACITY);
@@ -73,6 +76,7 @@ public class GlobeViewer extends BorderPane{
 				terain.setBiomeColor(GlobeData.GroundType.values()[gd.groundType[la][lo]], gd.groundMoisture[la][lo]);
 
 				terain.setOnMouseEntered(e->onMouseOver(terain));
+				elev.setOnMouseEntered(e->onMouseOver(elev));
 				temp.setOnMouseEntered(e->onMouseOver(terain));
 				humid.setOnMouseEntered(e->onMouseOver(terain));
 				cloud.setOnMouseEntered(e->onMouseOver(terain));
@@ -83,6 +87,7 @@ public class GlobeViewer extends BorderPane{
 				rain.setOnMouseEntered(e->onMouseOver(terain));
 
 				terainGrid.add(terain, lo, la);
+				elevGrid.add(elev, lo, la);
 				tempGrid.add(temp, lo, la);
 				humidityGrid.add(humid, lo, la);
 				cloudCoverGridAll.add(cloud, lo, la);
@@ -103,15 +108,22 @@ public class GlobeViewer extends BorderPane{
 		
 
 		numberOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
-		colorOverlay.getItems().addAll("None","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
+		colorOverlay.getItems().addAll("None","Elevation","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
 		numberOverlay.getSelectionModel().select(0);
 		colorOverlay.getSelectionModel().select(0);
 		altitudeSlider = new Slider(0, gd.altitudeDivisions-.5, 0);
 		numberOverlay.valueProperty().addListener(e->onChangedMode());
 		colorOverlay.valueProperty().addListener(e->onChangedMode());
 		altitudeSlider.valueProperty().addListener(e->onChangedMode());
-
-		layerModes.getItems().addAll(showSnow, altitudeSlider, new Label("Color-Number"),colorOverlay, numberOverlay);
+		zoomSlider = new Slider(1, 20, 1);
+		zoomSlider.valueProperty().addListener(v->{
+			layers.setScaleX(1/zoomSlider.getValue());
+			layers.setScaleY(1/zoomSlider.getValue());
+			layers.setTranslateX( -( layers.getWidth() / 2 - layers.getWidth() * layers.getScaleX() / 2 ) );
+			layers.setTranslateY( -( layers.getHeight() / 2 - layers.getHeight() * layers.getScaleY() / 2 ) );
+		});
+		
+		layerModes.getItems().addAll(showSnow, new Label("Altitude: "),altitudeSlider, new Label("Zoom:"), zoomSlider, new Label("Color-Number"),colorOverlay, numberOverlay);
 		showSnow.setSelected(false);
 		showSnow.setOnAction(e->{
 			if(showSnow.isSelected() && !layers.getChildren().contains(snowGrid))
@@ -157,6 +169,10 @@ public class GlobeViewer extends BorderPane{
 						fvt.setPercentColor(globeData.humidity[lat][lon][altitude]);
 					}
 				}
+				if(elevGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) {
+					if(elevGrid.isVisible())
+						fvt.setTempColor(MathUtils.map(globeData.elevation[lat][lon], -.5f, 6f, -20f, 100f));
+				}
 				if(rainGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(rainGrid.isVisible()) {
 						fvt.setPercentColor(globeData.percipitationChanceAt(lat, lon));
@@ -196,6 +212,7 @@ public class GlobeViewer extends BorderPane{
 				case "Cloud Coverage-All"  -> cloudCoverGridAll;
 				case "Percipitation" -> rainGrid;
 				case "Pressure" -> pressure;
+				case "Elevation" -> elevGrid;
 				default -> null;
 				};
 		HashedGridPane num = 

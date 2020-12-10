@@ -12,7 +12,7 @@ float __constant__ sqrt2  = 1.41421356237;
 float __constant__ sqrt3  = 1.73205080757;
 
 struct vec2{
-	float x, y,z;
+	float x, y;
 };
 struct vec3{
 	float x, y,z;
@@ -79,20 +79,23 @@ __device__ vec2 randomGradient(int ix, int iy) {
 }
 
 // Computes the dot product of the distance and gradient vectors.
-__device__ float dotGridGradient(int ix, int iy, float x, float y) {
+__device__ float dotGridGradient(int ix, int iy, float x, float y, int* worldSize) {
     // Get gradient from integer coordinates
+//	ix = ix % worldSize[0];
+//	iy = iy % worldSize[1];
     vec2 gradient = randomGradient(ix, iy);
 
     // Compute the distance vector
-    float dx = x - (float)ix;
-    float dy = y - (float)iy;
+    float dx = x - ix;
+    float dy = y - iy;
 
     // Compute the dot-product
     return (dx*gradient.x + dy*gradient.y);
 }
 
 // Compute Perlin noise at coordinates x, y
-__device__ float perlin(float x, float y) {
+//world size added for texture wrapping
+__device__ float perlin(float x, float y, int* worldSize) {
     // Determine grid cell coordinates
     int x0 = (int)x;
     int x1 = x0 + 1;
@@ -107,12 +110,12 @@ __device__ float perlin(float x, float y) {
     // Interpolate between grid point gradients
     float n0, n1, ix0, ix1, value;
 
-    n0 = dotGridGradient(x0, y0, x, y);
-    n1 = dotGridGradient(x1, y0, x, y);
+    n0 = dotGridGradient(x0, y0, x, y, worldSize);
+    n1 = dotGridGradient(x1, y0, x, y, worldSize);
     ix0 = interpolate(n0, n1, sx);
 
-    n0 = dotGridGradient(x0, y1, x, y);
-    n1 = dotGridGradient(x1, y1, x, y);
+    n0 = dotGridGradient(x0, y1, x, y, worldSize);
+    n1 = dotGridGradient(x1, y1, x, y, worldSize);
     ix1 = interpolate(n0, n1, sx);
 
     value = interpolate(ix0, ix1, sy);
@@ -133,34 +136,48 @@ extern "C"
 __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
+
 	if (i<n) {
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
+		//mostly random numbers
 
-		float p = perlin(pos.x, pos.y);
-
+		float s = 48;
+		float //p =  map(perlin((pos.x*1.7165589+00000.5)/worldSize[0]  , (pos.y*1.33025666+000000.5)/worldSize[1]  ), -1, 1, 0,1);
+		      //p += map(perlin((pos.x*1.3374248+87754.5)/worldSize[0]*2, (pos.y*1.33650714+788421.5)/worldSize[1]*2), -1, 1, -.25,.25);
+		      //p += map(perlin((pos.x*1.3356987-14567.5)/worldSize[0]*4, (pos.y1.324014897*+842619.5)/worldSize[1]*4), -1, 1, -.25,.25);
+			    p =  map(perlin((pos.x + 1/(s*2))/s       , (pos.y+(1/(s*2)))/s        , worldSize), -1, 1, 0, 1 );
+				s /= 2;
+			    p +=   s/32 *  perlin((pos.x + 1.5/(s*2) +55147)/s, (pos.y+(1.3/(s*2)))/s +887412 , worldSize);
+				s /= 2;
+			    p +=   s/32 *  perlin((pos.x + 1.6/(s*2) +55347)/s, (pos.y+(1.74/(s*2)))/s +877412, worldSize);
+				s /= 2;
+			    p +=   s/32 *  perlin((pos.x + 1.7/(s*2) +57747)/s, (pos.y+(1.6/(s*2)))/s +886492, worldSize);
+		      p*=1.5;
+		      p-=.2;
 		int gt = 0;
-		if(p<.71) {
+		if(p<.5) {
 			if(abs(map(pos.x, 0, worldSize[0], -90, 90)) > 80) {
 				gt = ICE;
 			}else {
 				gt = OCEAN; //about 71% of the earth's surface is water
 			}
 		}
-		else if(p<.73) gt = SAND;
-		else if(p<.85) gt = DIRT;
+		else if(p<.55) gt = SAND;
+		else if(p<.9) gt = DIRT;
 		else           gt = STONE;
 
 		groundType[pos.x][pos.y] = gt;
 
 		float e = 0;
-		if(p<.71)
+		if(p<.5)
 			e = map(p, 0, .71, -.5, 0);
-		else if(p<.85)
+		else if(p<.52)
 			e = map(p, .71, .85, 0, 1);
-		else if(p<.95)
+		else if(p<.68)
 			e = map(p, .85, .95, 1, 3);
 		else
 			e = map(p, .95, 1, 3, 6);
-		elevation[pos.x][pos.y] = e;
+		e*= 1000;
+		elevation[pos.x][pos.y] = p*1000;
 	}
 }
