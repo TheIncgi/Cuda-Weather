@@ -1,9 +1,12 @@
 package app.view;
 
 import app.GlobeData;
+import app.TerrainGenerator;
 import app.util.MathUtils;
+import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -42,7 +45,8 @@ public class GlobeViewer extends BorderPane{
 	private GlobeData globeData;
 	Label debug = new Label("debug");
 	DebugPanel debugTile = new DebugPanel("Pos:","Latitude:","Longitude:","Altitude:","Elevation:", "Ground:", "Snow:", "Temp:","Humidity:","Cloud:", "Cloud Cover:", "Wind:", "Rain:", "Pressure:");
-	VBox rightPanel = new VBox(debug, debugTile);
+	Button regenerate = new Button("Regen Terrain");
+	VBox rightPanel = new VBox(debug, debugTile, regenerate);
 	
 	public GlobeViewer(GlobeData gd) {
 		this.globeData = gd;
@@ -123,6 +127,23 @@ public class GlobeViewer extends BorderPane{
 			layers.setTranslateY( -( layers.getHeight() / 2 - layers.getHeight() * layers.getScaleY() / 2 ) );
 		});
 		
+		regenerate.setOnAction(e->{
+			regenerate.setDisable(true);
+			Thread buildWorld = new Thread(()->{
+				System.out.println("Regenerating...");
+				GlobeData result = new GlobeData(globeData.latitudeDivisions, globeData.longitudeDivisions, globeData.altitudeDivisions);
+				TerrainGenerator tg = new TerrainGenerator();
+				tg.generate(result);
+				System.out.println("Loading regenerated terrain..");
+				Platform.runLater(()->{
+					GlobeViewer.this.replaceGlobeData(result);
+					regenerate.setDisable(false);
+				});
+				
+			}, "World Construction");
+			buildWorld.start();
+		});
+		
 		layerModes.getItems().addAll(showSnow, new Label("Altitude: "),altitudeSlider, new Label("Zoom:"), zoomSlider, new Label("Color-Number"),colorOverlay, numberOverlay);
 		showSnow.setSelected(false);
 		showSnow.setOnAction(e->{
@@ -139,10 +160,21 @@ public class GlobeViewer extends BorderPane{
 	}
 	
 	public void replaceGlobeData(GlobeData gd) {
+		System.out.println("Updating map...");
 		this.globeData = gd;
+		for(int lat = 0; lat < globeData.latitudeDivisions; lat++) {
+			for(int lon = 0; lon < globeData.longitudeDivisions; lon++) {
+				if(terainGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt)
+					fvt.setBiomeColor(GlobeData.GroundType.values()[gd.groundType[lat][lon]], gd.groundMoisture[lat][lon]);
+			}
+		}
+		
+		
 		updateOverlays();
+		System.out.println("Replacement complete");
 	}
-
+	
+	
 	public void updateOverlays() {
 		debug.setText(String.format("World time: \n%8.4f\n%8.4f\n%s", globeData.time[0], globeData.time[1], globeData.getTime(0)));
 		

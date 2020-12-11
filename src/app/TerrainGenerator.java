@@ -62,6 +62,7 @@ public class TerrainGenerator {
 			elevation.pull(globe.elevation);
 		}finally {
 			JCudaDriver.cuMemFree(worldSizePtr);
+			JCudaDriver.cuModuleUnload(module);
 		}
 		tell("Generation complete", 1);
 	}

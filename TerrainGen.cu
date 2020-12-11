@@ -70,6 +70,10 @@ __device__ float distance(vec3 a, vec3 b){
 __device__ float interpolate(float x, float y,float f){
 	return clamp( x * (1-f) + y * f,   x, y);
 }
+__device__ float smoothstep(float a0, float a1, float w){
+    float value = w*w*w*(w*(w*6 - 15) + 10);
+    return a0 + value*(a1 - a0);
+}
 //from the wiki https://en.wikipedia.org/wiki/Perlin_noise
 __device__ vec2 randomGradient(int ix, int iy) {
     // Random float. No precomputed gradients mean this works for any number of grid coordinates
@@ -93,45 +97,56 @@ __device__ float dotGridGradient(int ix, int iy, float x, float y) {
 
 // Compute Perlin noise at coordinates x, y
 //world size added for texture wrapping
-__device__ float perlin(float x, float y, bool wrapX, bool wrapY) {
-    // Determine grid cell coordinates
+__device__ float perlin(double x, double y, bool wrapTop, bool wrapX1, bool wrapY, double scale) {
+//    if(wrapY) y -= scale-1;
+	// Determine grid cell coordinates
     int x0 = (int)x;
     int x1 = x0 + 1;
     int y0 = (int)y;
     int y1 = y0 + 1;
 
+    // ya, x       y1(+1), x
+    // yb, x+1     y2(+1), x+1
+
+
+
+    //if(x0%2==1 && y0 %2 == 1) return 1;
+    //if(wrapY) return 1 ;
     // Determine interpolation weights
     // Could also use higher order polynomial/s-curve here
-    float sx = x - (float)x0;
-    float sy = y - (float)y0;
+    double sx = x - x0;
+    double sy = y - y0;
 
-    float xm = wrapX? 0 : x;
-    float ym = wrapY? 0 : y;
-          x1 = wrapX? 0 : x1;
-          y1 = wrapY? 0 : y1;
+    double back = scale;//scale;
+//    wrapY = false;
+    y1       = wrapY? y1 - back : y1;
+    double ym = wrapY? y  - back : y;
+
+
 
 
     // Interpolate between grid point gradients
     float n0, n1, ix0, ix1, value;
 
     n0 = dotGridGradient(x0, y0, x, y);
-    n1 = dotGridGradient(x1, y0, xm, y);
-    ix0 = interpolate(n0, n1, sx);
+    n1 = dotGridGradient(x1, y0, x, y);
+    ix0 = smoothstep(n0, n1, sx);
 
     n0 = dotGridGradient(x0, y1, x, ym);
-    n1 = dotGridGradient(x1, y1, xm, ym);
-    ix1 = interpolate(n0, n1, sx);
+    n1 = dotGridGradient(x1, y1, x, ym);
+    ix1 = smoothstep(n0, n1, sx);
 
-    value = interpolate(ix0, ix1, sy);
+    value = smoothstep(ix0, ix1, sy);
     return value;
 }
 
-__device__ float perlin(int x, int y, float scale, float offsetX, float offsetY,float f1, float f2, int* worldSize){
-	float dx = (x +  f1/(scale*2)   +offsetX)/scale;
-	float dy = (y +  f2/(scale*2)   +offsetY)/scale;
-	bool wrapX = x==3 || x==(int)(worldSize[0]-1)/scale;
-	bool wrapY = y==(int)(worldSize[1]-1)/scale;
-	return perlin(dx, dy, wrapX, wrapY);
+__device__ float perlin(int x, int y, double scale, float offsetX, float offsetY, int* worldSize){
+	double dx = (x + offsetX*scale)/scale;//(x /*+  f1/(scale*2)*/   +offsetX)/scale;
+	double dy = (y + offsetY*scale)/scale;//(y /*+  f2/(scale*2)*/   +offsetY)/scale;
+	bool wrapTop = ((int)(x / scale)) == 0;
+	bool wrapBottom = ((int)(x / scale)) == ((int)(worldSize[0] / scale))-1;
+	bool wrapWidth = ((int)(y / scale)) == ((int)(worldSize[1] / scale))-1;
+	return perlin(dx, dy, wrapTop, wrapBottom, wrapWidth, 2*worldSize[0]/scale);
 }
 
 ////////////// Host functions ////////////////
@@ -153,17 +168,19 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
 		//mostly random numbers
 
-		float s = 48;
-		float   p =       perlin(pos.x, pos.y, s, 0, 0, 1, 1, worldSize) / 2 + .5;
-//				s /= 2;
-//				p += s/48 * perlin(pos.x, pos.y, s, 55147, 887412, 1.5, 1.3, worldSize);
-//				s /= 2;
-//				p += s/48 * perlin(pos.x, pos.y, s, 575347, 83412, 1.6, 1.74, worldSize);
-//				s /= 2;
-//				p += s/48 * perlin(pos.x, pos.y, s, 25747, 286492, 1.7, 1.6, worldSize);
-//				s /= 2;
-//				p += s/48 * perlin(pos.x, pos.y, s, 37747, 876484, 1.437, 1.18563, worldSize);
-//				s /= 2;
+		double s = (worldSize[0]) / 3.0;
+		double baseScale = s;
+		double p =       perlin(pos.x, pos.y, s, 0, 0, worldSize) / 2 + .5;
+			   s /= 2;
+			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 5, 82, worldSize);
+			   s /= 2;
+			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 3, 44, worldSize);
+			   s /= 2;
+			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 6, 22, worldSize);
+			   s /= 2;
+			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 15, 325, worldSize);
+			   s /= 2;
+			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 15, 325, worldSize);
 
 		//float   p =  map(perlin((pos.x + 1/(s*2))/s       , (pos.y+(1/(s*2)))/s        , worldSize), -1, 1, 0, 1 );
 //				s /= 2;
@@ -175,14 +192,14 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 		      p*=1.5;
 		      p-=.2;
 		int gt = 0;
-		if(p<.5) {
+		if(p<.6) {
 			if(abs(map(pos.x, 0, worldSize[0], -90, 90)) > 80) {
 				gt = ICE;
 			}else {
 				gt = OCEAN; //about 71% of the earth's surface is water
 			}
 		}
-		else if(p<.55) gt = SAND;
+		else if(p<.65) gt = SAND;
 		else if(p<.9) gt = DIRT;
 		else           gt = STONE;
 

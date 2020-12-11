@@ -14,12 +14,15 @@ import javafx.scene.layout.VBox;
 public class WorldSizePicker extends Pane{
 	VBox options = new VBox(10);
 	Optional<Consumer<Triplet<Integer, Integer, Integer>>> onSelect = Optional.empty();
+	int base = 48;
 	public WorldSizePicker() {
-		addOption("Mini", new Triplet<>(12, 25, 5));
-		addOption("Small", new Triplet<>(125, 250, 50));
-		addOption("Medium", new Triplet<>(600, 1200, 70));
-		addOption("Big", new Triplet<>(800, 1600, 75));
-		addOption("Huge", new Triplet<>(1250, 2500, 100));
+		addOption("Mini",   new Triplet<>(base  , base*2, 5));
+		addOption("Small",  new Triplet<>(base*2, base*4, 50));
+		addOption("Medium", new Triplet<>(base*3, base*6, 70));
+		addOption("Big",    new Triplet<>(base*4, base*8, 75));
+		addOption("Large",  new Triplet<>(base*5, base*10, 75));
+		addOption("Huge",   new Triplet<>(base*6, base*12, 100));
+		
 		
 		this.getChildren().add(options);
 		options.layoutXProperty().bind(widthProperty().divide(2).subtract(options.widthProperty().divide(2)));
