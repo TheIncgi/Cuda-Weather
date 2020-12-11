@@ -152,6 +152,10 @@ __device__ float perlin(int x, int y, double scale, float offsetX, float offsetY
 	return perlin(dx, dy, wrapTop, wrapBottom, wrapWidth, 2*worldSize[0]/scale);
 }
 
+__device__ int neighbors(int x, int y, int groundType, int* worldSize){
+	//TODO
+}
+
 ////////////// Host functions ////////////////
 int __constant__ SAND     = 0;
 int __constant__ DIRT     = 1;
@@ -218,5 +222,19 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 			e = map(p, .95, 1, 3, 6);
 		e*= 1000;
 		elevation[pos.x][pos.y] = p*1000;
+	}
+}
+
+/*
+ * if an ocean consists of less than Ceil(2.5% of the maps height)^2 tiles, it becomes a lake */
+extern "C"
+__global__ void convertLakes(int* worldSize, int** groundType, float** elevation){
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+
+	if (i<n) {
+		float thresh = pow(ceil(worldSize[0] * 0.025),2);
+		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
+
 	}
 }

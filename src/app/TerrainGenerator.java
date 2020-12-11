@@ -30,6 +30,7 @@ public class TerrainGenerator {
 		tell("Loading Terrain Generator...",.1f);
 		CUmodule module = loadModule("TerrainGen.ptx");
 		CUfunction groundFunc = CudaUtils.getFunction(module, "genTerrain");
+		CUfunction lakeFunc = CudaUtils.getFunction(module, "convertLakes");
 		
 		CUdeviceptr worldSizePtr = loadToGPU( new int[] { //constant
 				globe.latitudeDivisions, 
@@ -57,6 +58,9 @@ public class TerrainGenerator {
 			tell("Generating ground...", -1);
 			JCudaDriver.cuCtxSynchronize();
 			JCudaDriver.cuLaunchKernel(groundFunc,
+					dim, dim, dim, blockSizeX, 1, 1, 0, null, kernel, null);
+			JCudaDriver.cuCtxSynchronize();
+			JCudaDriver.cuLaunchKernel(lakeFunc,
 					dim, dim, dim, blockSizeX, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();
 			groundType.pull(globe.groundType);

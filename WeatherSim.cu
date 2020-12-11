@@ -77,7 +77,7 @@ __device__ float distance(vec3 a, vec3 b){
 	float dz = b.z-a.z;
 	return sqrt( dx*dx + dy*dy + dz*dz );
 }
-
+//polar to cartesian
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude){
 	float yaw = (float) (360.0 * longitude / worldSize[1]);
 	float pitch = (float) (180.0 * latitude / worldSize[0] -90.0);
@@ -122,7 +122,9 @@ __device__ float maxWaterHeld(float temp){
 			) ) ;
 }
 
-
+/**
+ * Calculates the mass of an air volume in kg
+ * */
 __device__ float airMass(float kmCubed, float temp, float relHumid){
 	float mass = airDensity(temp) * kmCubed; //mass of air
 	//1 billion cubic meters in 1 cubic km
@@ -136,6 +138,10 @@ __device__ float airMass(float kmCubed, float temp, float relHumid){
 
 //Host accessable functions
 
+
+/**
+ * Setup a world pressure and temperature
+ * */
 extern "C"
 __global__ void initAtmosphere(
 	int* worldSize,
@@ -152,7 +158,6 @@ __global__ void initAtmosphere(
 		float maxTemp = map(alt,0, 1, 95, -40);
 		float minTemp = map(alt,0, 1, -40, -50);
 		tempOut[pos.x][pos.y][pos.z] = map(cos(abs(lat) * HALF_C), 0,1, minTemp, maxTemp);
-//		tempOut[pos.x][pos.y][pos.z] =  cos(lat * HALF_C);
 	}
 }
 
