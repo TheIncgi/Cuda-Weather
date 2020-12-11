@@ -65,6 +65,9 @@ __device__ float distance(vec3 a, vec3 b){
 	float dz = b.z-a.z;
 	return sqrt( dx*dx + dy*dy + dz*dz );
 }
+__device__ float zone(float x, float target, float width, float sharpness){
+	return 1 / ( 1 + pow(abs(target/width - x/width), sharpness) );
+}
 ///////////// Perlin /////////////////
 
 __device__ float interpolate(float x, float y,float f){
@@ -182,18 +185,17 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 			   s /= 2;
 			   p +=  s/baseScale * perlin(pos.x, pos.y, s, 15, 325, worldSize);
 
-		//float   p =  map(perlin((pos.x + 1/(s*2))/s       , (pos.y+(1/(s*2)))/s        , worldSize), -1, 1, 0, 1 );
-//				s /= 2;
-//			    p +=   s/48 *  perlin((pos.x + 1.5/(s*2) +55147)/s, (pos.y+(1.3/(s*2)))/s +887412 , worldSize);
-//				s /= 2;
-//			    p +=   s/48 *  perlin((pos.x + 1.6/(s*2) +55347)/s, (pos.y+(1.74/(s*2)))/s +877412, worldSize);
-//				s /= 2;
-//			    p +=   s/48 *  perlin((pos.x + 1.7/(s*2) +57747)/s, (pos.y+(1.6/(s*2)))/s +886492, worldSize);
 		      p*=1.5;
 		      p-=.2;
+		float latitude = map(pos.x, 0, worldSize[0], 90, -90);
+		float deadZone = 12;
+		float iceyP = p* (zone(abs(latitude), 90, 6, 1.4));//(p * ( 1-zone(abs(latitude), 90, 2, 1.4)));
+		p *= 1- zone(abs(latitude), 90, deadZone, 4);
+//		p *= 1 - 1 / ( 1 + pow(abs(90/deadZone-abs(latitude)/deadZone), 4) );
+
 		int gt = 0;
 		if(p<.6) {
-			if(abs(map(pos.x, 0, worldSize[0], -90, 90)) > 80) {
+			if(/*abs(latitude) > 78 &&*/ iceyP>.4) {
 				gt = ICE;
 			}else {
 				gt = OCEAN; //about 71% of the earth's surface is water

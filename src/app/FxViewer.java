@@ -50,7 +50,9 @@ public class FxViewer extends Application{
 				Platform.runLater(()->{
 					lp.status("Building display...", 1);
 					GlobeViewer gv = new GlobeViewer(result);
+					launchSimThread(result, gv);
 					scene.setRoot(gv);
+					gv.setBottom(simulationControls);
 				});
 				
 			}, "World Construction");
