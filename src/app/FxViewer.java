@@ -116,6 +116,7 @@ public class FxViewer extends Application{
 					e1.printStackTrace();
 				}
 			}
+			simulator.close();
 			System.out.println("BG Thread has exited");
 		}, "Simulation Thread");
 		bgThread.start();

@@ -79,10 +79,8 @@ __device__ vec2 randomGradient(int ix, int iy) {
 }
 
 // Computes the dot product of the distance and gradient vectors.
-__device__ float dotGridGradient(int ix, int iy, float x, float y, int* worldSize) {
+__device__ float dotGridGradient(int ix, int iy, float x, float y) {
     // Get gradient from integer coordinates
-//	ix = ix % worldSize[0];
-//	iy = iy % worldSize[1];
     vec2 gradient = randomGradient(ix, iy);
 
     // Compute the distance vector
@@ -95,7 +93,7 @@ __device__ float dotGridGradient(int ix, int iy, float x, float y, int* worldSiz
 
 // Compute Perlin noise at coordinates x, y
 //world size added for texture wrapping
-__device__ float perlin(float x, float y, int* worldSize) {
+__device__ float perlin(float x, float y, bool wrapX, bool wrapY) {
     // Determine grid cell coordinates
     int x0 = (int)x;
     int x1 = x0 + 1;
@@ -107,19 +105,33 @@ __device__ float perlin(float x, float y, int* worldSize) {
     float sx = x - (float)x0;
     float sy = y - (float)y0;
 
+    float xm = wrapX? 0 : x;
+    float ym = wrapY? 0 : y;
+          x1 = wrapX? 0 : x1;
+          y1 = wrapY? 0 : y1;
+
+
     // Interpolate between grid point gradients
     float n0, n1, ix0, ix1, value;
 
-    n0 = dotGridGradient(x0, y0, x, y, worldSize);
-    n1 = dotGridGradient(x1, y0, x, y, worldSize);
+    n0 = dotGridGradient(x0, y0, x, y);
+    n1 = dotGridGradient(x1, y0, xm, y);
     ix0 = interpolate(n0, n1, sx);
 
-    n0 = dotGridGradient(x0, y1, x, y, worldSize);
-    n1 = dotGridGradient(x1, y1, x, y, worldSize);
+    n0 = dotGridGradient(x0, y1, x, ym);
+    n1 = dotGridGradient(x1, y1, xm, ym);
     ix1 = interpolate(n0, n1, sx);
 
     value = interpolate(ix0, ix1, sy);
     return value;
+}
+
+__device__ float perlin(int x, int y, float scale, float offsetX, float offsetY,float f1, float f2, int* worldSize){
+	float dx = (x +  f1/(scale*2)   +offsetX)/scale;
+	float dy = (y +  f2/(scale*2)   +offsetY)/scale;
+	bool wrapX = x==3 || x==(int)(worldSize[0]-1)/scale;
+	bool wrapY = y==(int)(worldSize[1]-1)/scale;
+	return perlin(dx, dy, wrapX, wrapY);
 }
 
 ////////////// Host functions ////////////////
@@ -142,16 +154,24 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 		//mostly random numbers
 
 		float s = 48;
-		float //p =  map(perlin((pos.x*1.7165589+00000.5)/worldSize[0]  , (pos.y*1.33025666+000000.5)/worldSize[1]  ), -1, 1, 0,1);
-		      //p += map(perlin((pos.x*1.3374248+87754.5)/worldSize[0]*2, (pos.y*1.33650714+788421.5)/worldSize[1]*2), -1, 1, -.25,.25);
-		      //p += map(perlin((pos.x*1.3356987-14567.5)/worldSize[0]*4, (pos.y1.324014897*+842619.5)/worldSize[1]*4), -1, 1, -.25,.25);
-			    p =  map(perlin((pos.x + 1/(s*2))/s       , (pos.y+(1/(s*2)))/s        , worldSize), -1, 1, 0, 1 );
-				s /= 2;
-			    p +=   s/32 *  perlin((pos.x + 1.5/(s*2) +55147)/s, (pos.y+(1.3/(s*2)))/s +887412 , worldSize);
-				s /= 2;
-			    p +=   s/32 *  perlin((pos.x + 1.6/(s*2) +55347)/s, (pos.y+(1.74/(s*2)))/s +877412, worldSize);
-				s /= 2;
-			    p +=   s/32 *  perlin((pos.x + 1.7/(s*2) +57747)/s, (pos.y+(1.6/(s*2)))/s +886492, worldSize);
+		float   p =       perlin(pos.x, pos.y, s, 0, 0, 1, 1, worldSize) / 2 + .5;
+//				s /= 2;
+//				p += s/48 * perlin(pos.x, pos.y, s, 55147, 887412, 1.5, 1.3, worldSize);
+//				s /= 2;
+//				p += s/48 * perlin(pos.x, pos.y, s, 575347, 83412, 1.6, 1.74, worldSize);
+//				s /= 2;
+//				p += s/48 * perlin(pos.x, pos.y, s, 25747, 286492, 1.7, 1.6, worldSize);
+//				s /= 2;
+//				p += s/48 * perlin(pos.x, pos.y, s, 37747, 876484, 1.437, 1.18563, worldSize);
+//				s /= 2;
+
+		//float   p =  map(perlin((pos.x + 1/(s*2))/s       , (pos.y+(1/(s*2)))/s        , worldSize), -1, 1, 0, 1 );
+//				s /= 2;
+//			    p +=   s/48 *  perlin((pos.x + 1.5/(s*2) +55147)/s, (pos.y+(1.3/(s*2)))/s +887412 , worldSize);
+//				s /= 2;
+//			    p +=   s/48 *  perlin((pos.x + 1.6/(s*2) +55347)/s, (pos.y+(1.74/(s*2)))/s +877412, worldSize);
+//				s /= 2;
+//			    p +=   s/48 *  perlin((pos.x + 1.7/(s*2) +57747)/s, (pos.y+(1.6/(s*2)))/s +886492, worldSize);
 		      p*=1.5;
 		      p-=.2;
 		int gt = 0;

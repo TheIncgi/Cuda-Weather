@@ -12,7 +12,7 @@ import jcuda.driver.JCudaDriver;
 
 import static app.CudaUtils.*;
 
-public class Simulator {
+public class Simulator implements AutoCloseable{
 	GlobeData in;
 	Runnable onStepComplete, onResultReady;
 	
@@ -268,6 +268,30 @@ public class Simulator {
 	/**It's really the current input, but the old output becomes the new input*/
 	public GlobeData getStepResult() {
 		return in;
+	}
+	
+	@Override
+	public void close() {
+		JCudaDriver.cuMemFree(worldSizePtr);
+		worldSpeed.close();
+		worldTimePtr[0].close();
+		worldTimePtr[1].close();
+		groundType.close();
+		elevation.close();
+		groundMoisture[0].close();
+		groundMoisture[1].close();
+		snowCover[0].close();
+		snowCover[1].close();
+		temperature[0].close();
+		temperature[1].close();
+		pressure[0].close();
+		pressure[1].close();
+		humidity[0].close();
+		humidity[1].close();
+		cloudCover[0].close();
+		cloudCover[1].close();
+		windSpeed[0].close();
+		windSpeed[1].close();
 	}
 	
 	/*
