@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import app.CudaUtils;
+import jcuda.CudaException;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.JCudaDriver;
@@ -51,8 +52,8 @@ public class CudaFloat4 implements AutoCloseable{
 	public void close() {
 		for (int i = 0; i < pointerArray.length; i++) {
 			inner[i].close();
-			JCudaDriver.cuMemFree(pointerArray[i]);
+			try{JCudaDriver.cuMemFree(pointerArray[i]);}catch(CudaException ce) {};
 		}
-		JCudaDriver.cuMemFree(thePointer);
+		try{JCudaDriver.cuMemFree(thePointer);}catch(CudaException ce) {};
 	}
 }

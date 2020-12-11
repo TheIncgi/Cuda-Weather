@@ -55,6 +55,7 @@ public class TerrainGenerator {
 			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
 			if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
 			tell("Generating ground...", -1);
+			JCudaDriver.cuCtxSynchronize();
 			JCudaDriver.cuLaunchKernel(groundFunc,
 					dim, dim, dim, blockSizeX, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();

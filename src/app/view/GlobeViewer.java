@@ -46,7 +46,8 @@ public class GlobeViewer extends BorderPane{
 	Label debug = new Label("debug");
 	DebugPanel debugTile = new DebugPanel("Pos:","Latitude:","Longitude:","Altitude:","Elevation:", "Ground:", "Snow:", "Temp:","Humidity:","Cloud:", "Cloud Cover:", "Wind:", "Rain:", "Pressure:");
 	Button regenerate = new Button("Regen Terrain");
-	VBox rightPanel = new VBox(debug, debugTile, regenerate);
+	Button testButton = new Button("Test");
+	VBox rightPanel = new VBox(debug, debugTile, regenerate, testButton);
 	
 	public GlobeViewer(GlobeData gd) {
 		this.globeData = gd;
@@ -144,6 +145,18 @@ public class GlobeViewer extends BorderPane{
 			buildWorld.start();
 		});
 		
+		testButton.setOnAction(e->{
+			float sum = 0;
+			for (int la = 0; la < globeData.latitudeDivisions; la++) {
+				for (int lo = 0; lo < globeData.longitudeDivisions; lo++) {
+					for (int al = 0; al < globeData.altitudeDivisions; al++) {
+						sum += globeData.windSpeed[la][lo][al*3]; //debug, holds air mass rn
+					}
+				}
+			}
+			testButton.setText(sum+"");
+		});
+		
 		layerModes.getItems().addAll(showSnow, new Label("Altitude: "),altitudeSlider, new Label("Zoom:"), zoomSlider, new Label("Color-Number"),colorOverlay, numberOverlay);
 		showSnow.setSelected(false);
 		showSnow.setOnAction(e->{
@@ -219,7 +232,7 @@ public class GlobeViewer extends BorderPane{
 					}
 				if(windGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(windGrid.isVisible()) {
-						fvt.setWind(globeData.windSpeed[lat][lon][altitude]);
+						fvt.setWind(globeData.windSpeed[lat][lon][altitude*3],globeData.windSpeed[lat][lon][altitude*3+1],globeData.windSpeed[lat][lon][altitude*3+2]);
 					}
 				if(pressure.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(pressure.isVisible()) {
@@ -299,7 +312,7 @@ public class GlobeViewer extends BorderPane{
 		debugTile.changeValue("Humidity:", 		String.format("%3.0f%%",   globeData.humidity[fvt.y][fvt.x][alti] * 100));
 		debugTile.changeValue("Cloud:", 		String.format("%3.0f%%",   globeData.cloudCover[fvt.y][fvt.x][alti] * 100));
 		debugTile.changeValue("Cloud Cover:", 	String.format("%3.0f%%",   cu * 100)); //not accounting for angle of sun
-		debugTile.changeValue("Wind:", 			String.format("%5.2f\n%5.2f\n%5.2f",   globeData.windSpeed[fvt.y][fvt.x][alti][0],globeData.windSpeed[fvt.y][fvt.x][alti][1],globeData.windSpeed[fvt.y][fvt.x][alti][2]));
+		debugTile.changeValue("Wind:", 			String.format("%5.2f\n%5.2f\n%5.2f",   globeData.windSpeed[fvt.y][fvt.x][alti*3],globeData.windSpeed[fvt.y][fvt.x][alti*3+1],globeData.windSpeed[fvt.y][fvt.x][alti*3+2]));
 		debugTile.changeValue("Rain:", 			String.format("%3.0f%%S", globeData.percipitationChanceAt(fvt.y, fvt.x) * 100));
 		debugTile.changeValue("Pressure:", 		String.format("%4.3f",   globeData.pressure[fvt.y][fvt.x][alti]));
 	}

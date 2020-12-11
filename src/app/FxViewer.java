@@ -8,7 +8,10 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToolBar;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 public class FxViewer extends Application{
@@ -19,7 +22,9 @@ public class FxViewer extends Application{
 	//GlobeData dummy = new GlobeData(1500, 2500, 50).random();
 	//GlobeViewer gv = new GlobeViewer(dummy);
 	Button timeStep = new Button("Step");
-	ToolBar simulationControls = new ToolBar(timeStep);
+	ProgressBar timestepProgress = new ProgressBar();
+	Label timeStepStatus = new Label("Not ready");
+	ToolBar simulationControls = new ToolBar(timeStep, timestepProgress, timeStepStatus);
 	Simulator simulator;
 	Thread bgThread;
 	GlobeData result;
@@ -46,7 +51,7 @@ public class FxViewer extends Application{
 				});
 				
 				tg.generate(result);
-				
+				CudaUtils.destroyContext();
 				Platform.runLater(()->{
 					lp.status("Building display...", 1);
 					GlobeViewer gv = new GlobeViewer(result);
@@ -61,14 +66,15 @@ public class FxViewer extends Application{
 		});
 		
 		timeStep.setOnAction(e->{
+			System.out.println("Triggering timestep");
 			flag = true;
 			timeStep.setDisable(true);
 			synchronized (bgThread) {
 				bgThread.notify();
 			}
 		});
-		
-		
+		timeStep.setDisable(true);
+		//timestepProgress.setVisible(false);
 		
 		stage.setOnCloseRequest(e->{
 			running = false;
@@ -78,7 +84,8 @@ public class FxViewer extends Application{
 				bgThread.notify();
 			}
 		});
-		
+		stage.setTitle("Weather with CUDA - TheIncgi");
+		stage.getIcons().add(new Image(FxViewer.class.getResourceAsStream("storm32.png")));
 		stage.show();
 		
 	}
@@ -93,6 +100,14 @@ public class FxViewer extends Application{
 			CudaUtils.init();
 			System.out.println("Creating simulation space");
 			simulator = new Simulator(world);
+			System.out.println("  adding simulation listeners");
+			simulator.setProgressListener((prog, status)->{
+				Platform.runLater(()->{
+					timestepProgress.setProgress(prog);
+					timeStepStatus.setText(status);
+					//timestepProgress.setVisible(prog<1);
+				});
+			});
 			simulator.setOnStepComplete(()->{
 				Platform.runLater(()->{
 					timeStep.setDisable(false);
@@ -104,10 +119,16 @@ public class FxViewer extends Application{
 				});
 			});
 			
+			System.out.println("BG - Waiting for trigger");
+			Platform.runLater(()->{
+				timeStep.setDisable(false);
+				timeStepStatus.setText("Ready");
+			});
 			while(running) {
 				try {
 					synchronized (bgThread) {
 						bgThread.wait();
+						System.out.println("BG - Notified");
 					}
 					if(flag) {
 						flag = false;
@@ -118,6 +139,7 @@ public class FxViewer extends Application{
 					e1.printStackTrace();
 				}
 			}
+			System.out.println("Closing resources...");
 			simulator.close();
 			System.out.println("BG Thread has exited");
 		}, "Simulation Thread");

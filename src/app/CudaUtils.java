@@ -24,9 +24,12 @@ public class CudaUtils {
 	private static boolean init = false;
 	
 	
-	public static void init() {
+	public static synchronized void init() {
+		long x = System.currentTimeMillis();
+		System.out.println("Cuda init on thread "+Thread.currentThread().getName());
 		if(init) {
 			JCudaDriver.cuCtxSetCurrent(context);
+			System.out.println("Cuda Re-Init took" + (System.currentTimeMillis()-x)+" millis");
 			return;
 		}
 		init = true;
@@ -37,6 +40,13 @@ public class CudaUtils {
         cuDeviceGet(device, 0);
         context = new CUcontext();
         cuCtxCreate(context, 0, device);
+        System.out.println("Cuda Init took" + (System.currentTimeMillis()-x)+" millis");
+        
+	}
+	
+	public static synchronized void destroyContext() {
+		JCudaDriver.cuCtxDestroy(context);
+		init = false;
 	}
 	
 	public static CUdevice getDevice() {

@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import app.CudaUtils;
+import jcuda.CudaException;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.JCudaDriver;
@@ -26,13 +27,13 @@ public class CudaFloat2 implements AutoCloseable{
 	public void push(float[][] data) {
 		if(data.length!=dim1 || data[0].length!=dim2) throw new IllegalArgumentException("Dimension Missmatch");
 		for(int x = 0; x<dim1; x++)
-			JCudaDriver.cuMemcpyHtoD(pointerArray[x], Pointer.to(data[x]), Float.BYTES * dim2);
+			JCudaDriver.cuMemcpyHtoDAsync(pointerArray[x], Pointer.to(data[x]), Float.BYTES * dim2, null);
 	}
 	
 	/**Device to host*/
 	public void pull(float[][] data){
 		for(int i = 0; i<pointerArray.length; i++) {
-			JCudaDriver.cuMemcpyDtoH(Pointer.to(data[i]), pointerArray[i], dim2*Float.BYTES);
+			JCudaDriver.cuMemcpyDtoHAsync(Pointer.to(data[i]), pointerArray[i], dim2*Float.BYTES, null);
 		}
 	}
 	
@@ -47,8 +48,8 @@ public class CudaFloat2 implements AutoCloseable{
 	@Override
 	public void close() {
 		for (int i = 0; i < pointerArray.length; i++) {
-			JCudaDriver.cuMemFree(pointerArray[i]);
+			try{JCudaDriver.cuMemFree(pointerArray[i]);}catch(CudaException ce) {};
 		}
-		JCudaDriver.cuMemFree(thePointer);
+		try{JCudaDriver.cuMemFree(thePointer);}catch(CudaException ce) {};
 	}
 }

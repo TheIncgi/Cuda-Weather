@@ -83,10 +83,10 @@ public class FloatVisulaizationTile extends Pane {
 		rect.setVisible(true);
 	}
 
-	public void setWind(float[] w) {
-		float speed = MathUtils.dist(0f, 0f, 0f, w[0], w[1], w[2]);
+	public void setWind(float latW, float lonW, float altW) {
+		float speed = MathUtils.dist(0f, 0f, 0f, latW, lonW, altW);
 		float mag = (float) Math.log(speed);
-		float angle = (float) (Math.toDegrees(Math.atan2(w[1],w[0])) + 360) % 360;
+		float angle = (float) (Math.toDegrees(Math.atan2(lonW,latW)) + 360) % 360;
 		
 		String dir = "";
 		if(mag > .1) {

@@ -13,14 +13,14 @@ import app.util.Vector3f;
 import jcuda.driver.CUdeviceptr;
 
 public class GlobeData {
-	
+	private boolean initalized = false;
 	/**Time is stored as {world rotation, world revolution}<br>
 	 * where {1,2} is 1 day after the second year*/
 	public final float[] time;
 	/**[Latitude][logitude][altitude]*/
 	public final float[][][] temp, humidity, cloudCover, pressure;
 	/**[Latitude][logitude][altitude]*/
-	public final float[][][][] windSpeed;
+	public final float[][][] windSpeed;
 	/**[Latitude][logitude]*/
 	public final float[][]    snowCover, groundMoisture, elevation;
 	/**[Latitude][logitude]*/
@@ -53,7 +53,7 @@ public class GlobeData {
 		pressure = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
 		humidity = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
 		cloudCover = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
-		windSpeed = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions][3];
+		windSpeed = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions*3];
 		snowCover = new float[latitudeDivisions][longitudeDivisions];
 		groundMoisture = new float[latitudeDivisions][longitudeDivisions];
 		groundType = new int[latitudeDivisions][longitudeDivisions];
@@ -143,9 +143,9 @@ public class GlobeData {
 					humidity[lat][lon][al] = r.nextFloat();
 					cloudCover[lat][lon][al] = r.nextFloat()>.5? r.nextFloat() : 0;
 					pressure[lat][lon][al] = (r.nextFloat()-.5f)*.2f+1;
-					windSpeed[lat][lon][al][0] = r.nextFloat()*r.nextFloat()*.1f -.05f ;
-					windSpeed[lat][lon][al][1] = r.nextFloat()*r.nextFloat()*.1f -.05f;
-					windSpeed[lat][lon][al][2] = r.nextFloat()*r.nextFloat()*.05f -.025f;
+					windSpeed[lat][lon][al*3] = r.nextFloat()*r.nextFloat()*.1f -.05f ;
+					windSpeed[lat][lon][al*3+1] = r.nextFloat()*r.nextFloat()*.1f -.05f;
+					windSpeed[lat][lon][al*3+2] = r.nextFloat()*r.nextFloat()*.05f -.025f;
 					
 					
 				}
@@ -198,5 +198,12 @@ public class GlobeData {
 	
 	public static long byteSizeIf(int lon, int lat, int alt) {
 		return ((long)lon)*lat*alt*9*4;
+	}
+	
+	public boolean isInitalized() {
+		return initalized;
+	}
+	public void markInitalized() {
+		this.initalized = true;
 	}
 }

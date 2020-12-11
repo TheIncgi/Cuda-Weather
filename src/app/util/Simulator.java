@@ -1,5 +1,7 @@
 package app.util;
 
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import app.CudaUtils;
@@ -19,6 +21,7 @@ public class Simulator implements AutoCloseable{
 	float timeStepSizeSeconds          = 5;
 	float worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
 	float worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
+	private Triplet<CUfunction, Boolean, Pointer> atmosphereInit;
 	private Triplet<CUfunction, Boolean, Pointer[]>[] funcs;
 	//constant
 	private CUdeviceptr worldSizePtr;
@@ -32,24 +35,37 @@ public class Simulator implements AutoCloseable{
 			             pressure    = new CudaFloat3[2], 
 			             humidity    = new CudaFloat3[2], 
 			             cloudCover  = new CudaFloat3[2];
-	private CudaFloat4[] windSpeed = new CudaFloat4[2];
+	private CudaFloat3[] windSpeed = new CudaFloat3[2];
 	
 	//private Pointer[] kernalParams = new Pointer[2];
 	private int activeKernal = 0;
 	private boolean dataLoaded = false;
+	private CUmodule module;
+	private Optional<BiConsumer<Double,String>> progressListener = Optional.empty();
 	
 	public Simulator(GlobeData world) {
 		in = world;
 		//out = new GlobeData(in);
+		System.out.println("Simulation - Creating pointers");
 		initPtrs();
-		
+		System.out.println("Simulation - Setting up functions");
 		setupFuncs();
 	}
 	
 	@SuppressWarnings("unchecked")
 	private void setupFuncs() {
-		CUmodule module = loadModule("WeatherSim.ptx");
+		module = loadModule("WeatherSim.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
+		
+		atmosphereInit = new Triplet<CUfunction, Boolean, Pointer>(
+				getFunction(module, "initAtmosphere"),
+				true,
+				Pointer.to(
+						worldSize,
+						pressure[0].getArgPointer(),
+						temperature[0].getArgPointer()
+						)
+		);
 		funcs = new Triplet[] {
 				new Triplet<>(getFunction(module, "copy"), true, new Pointer[] {
 						Pointer.to(
@@ -151,8 +167,8 @@ public class Simulator implements AutoCloseable{
 		humidity[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
 		cloudCover[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
 		cloudCover[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		windSpeed[0] 		= new CudaFloat4(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions, 3);
-		windSpeed[1] 		= new CudaFloat4(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions, 3);
+		windSpeed[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions*3);
+		windSpeed[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions*3);
 		
 	}
 
@@ -199,17 +215,49 @@ public class Simulator implements AutoCloseable{
 		});
 	}
 	
+	/**
+	 * Use on newly generated worlds to add air
+	 * */
+	public void initAtmosphere() {
+		int blockSizeX = 256;
+		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
+		Triplet<CUfunction, Boolean, Pointer> step = atmosphereInit;
+		CUfunction f = step.a;
+		double blocksNeeded = gridSizeX_withAtmosphere;
+		
+		int dimLimit = 65535;
+		int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+		if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+		JCudaDriver.cuLaunchKernel(f,       
+			//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
+		    dim,  dim, dim,      // Grid dimension 
+		    blockSizeX, 1, 1,      // Block dimension
+		    0, null,               // Shared memory size and stream 
+		    step.c, null // Kernel- and extra parameters
+		); 
+		
+		JCudaDriver.cuCtxSynchronize();
+	}
+	
 	/**Begins calculation of next timestep<br>
 	 * Results will be ready before this emthod unblocks
 	 * returns number of milliseconds elapsed
 	 * */
 	public synchronized long timeStep() {
+		System.out.println("Begining timestep..");
 		long start = System.currentTimeMillis();
 		if(!dataLoaded) {
+			progress(0, "Pushing data");
 			pushData();
+			JCudaDriver.cuCtxSynchronize();
 			dataLoaded = true;
 		}
 		
+		if(!in.isInitalized()) {
+			progress(0, "Initalizing atmosphere");
+			initAtmosphere();
+			in.markInitalized();
+		}
 		//sun warming
 		//infrared radiative cooling
 		//rates should be balanced
@@ -222,7 +270,9 @@ public class Simulator implements AutoCloseable{
 		int blockSizeX = 256;
 		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
 		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
-		for (Triplet<CUfunction, Boolean, Pointer[]> step : funcs) {
+		for(int i = 0; i<funcs.length; i++) {
+			Triplet<CUfunction, Boolean, Pointer[]> step = funcs[i];
+			progress(i / funcs.length, "Step "+(i+1)+" of "+funcs.length);
 			CUfunction f = step.a;
 			double blocksNeeded = step.b? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
 			
@@ -240,7 +290,10 @@ public class Simulator implements AutoCloseable{
 			JCudaDriver.cuCtxSynchronize();
 			
 		}
+		progress(1, "Pulling result");
 		pullResult(); //read from input side while also computing
+		progress(1, "Waiting for result");
+		JCudaDriver.cuCtxSynchronize();
 		onResultReady.run();
 		
 		activeKernal = 1-activeKernal;
@@ -248,9 +301,17 @@ public class Simulator implements AutoCloseable{
 		if(onStepComplete!=null)
 			onStepComplete.run();
 		long end = System.currentTimeMillis();
+		progress(-1, "Ready");
 		return end-start;
 	}
 	
+	public void setProgressListener(BiConsumer<Double,String> progressListener) {
+		this.progressListener = Optional.ofNullable(progressListener);
+	}
+	private void progress(double i, String status) {
+		progressListener.ifPresent(p->p.accept(i, status));
+	}
+
 	/**
 	 * Called when the timestep has completed computation for the next result<br>
 	 * if waiting for a result, instead use onResultReady
@@ -292,6 +353,7 @@ public class Simulator implements AutoCloseable{
 		cloudCover[1].close();
 		windSpeed[0].close();
 		windSpeed[1].close();
+		JCudaDriver.cuModuleUnload(module);
 	}
 	
 	/*
