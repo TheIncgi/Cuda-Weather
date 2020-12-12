@@ -46,6 +46,22 @@ __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	return dim3(latitude, longitude, altitude);
 }
 
+__device__ dim3 wrapCoords(int x, int y, int* worldSize){
+	int la = x;
+	int lo = y % worldSize[1];
+	if(la < 0){
+		lo = (lo + worldSize[1] / 2) % worldSize[1];
+		la = -la;
+	}else if(la >= worldSize[0]){
+		lo = (lo + worldSize[1] / 2) % worldSize[1];
+		la = worldSize[0]-(la-worldSize[0]+1);
+	}
+	la = (la + worldSize[0]) % worldSize[0];
+	lo = (lo + worldSize[1]) % worldSize[1];
+	dim3 out(la, lo, 0);
+	return out;
+}
+
 __device__ float map(float x, float inMin, float inMax, float outMin, float outMax) {
 	return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
@@ -152,8 +168,25 @@ __device__ float perlin(int x, int y, double scale, float offsetX, float offsetY
 	return perlin(dx, dy, wrapTop, wrapBottom, wrapWidth, 2*worldSize[0]/scale);
 }
 
-__device__ int neighbors(int x, int y, int groundType, int* worldSize){
-	//TODO
+__device__ int countNeighbors(int lat, int lon, int dirLat, int dirLon, int* worldSize, int** ground, int matchType, int depth){
+	dim3 pos = wrapCoords(lat, lon, worldSize);
+	lat = pos.x;
+	lon = pos.y;
+	//return lat*1000+lon;
+	int matches = ground[lat>47?lat:0][lon] == matchType ? 1 : 0;
+	if(matches == 0) return 0;
+	if(depth <= 0) return 1;
+	bool start = dirLat==0 && dirLon==0;
+
+	if(start || dirLat==1)
+		matches += countNeighbors(lat+1, lon  ,  1,  0, worldSize, ground, matchType, depth-1);
+	if(start || dirLat==-1)
+		matches += countNeighbors(lat-1, lon  , -1,  0, worldSize, ground, matchType, depth-1);
+	if(start || dirLon== 1 || (dirLon==0 && dirLat!=0))
+		matches += countNeighbors(lat  , lon+1,  0,  1, worldSize, ground, matchType, depth+1);
+	if(start || dirLon==-1 || (dirLat==0 && dirLat!=0))
+	    matches += countNeighbors(lat  , lon-1,  0, -1, worldSize, ground, matchType, depth+1);
+	return matches;
 }
 
 ////////////// Host functions ////////////////
@@ -233,8 +266,13 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 
 	if (i<n) {
-		float thresh = pow(ceil(worldSize[0] * 0.025),2);
+		int thresh = ceil(pow(ceil(worldSize[0] * 0.025),2));
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
-
+		if(groundType[pos.x][pos.y]==OCEAN){
+			int matches = countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, OCEAN, thresh+1);
+			elevation[pos.x][pos.y] = matches;
+			if(matches < thresh)
+				groundType[pos.x][pos.y] = OCEAN;//LAKE;
+		}
 	}
 }
