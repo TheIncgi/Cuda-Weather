@@ -54,6 +54,22 @@ __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	return dim3(latitude, longitude, altitude);
 }
 
+__device__ dim3 wrapCoords(int x, int y, int* worldSize){
+	int la = x;
+	int lo = y % worldSize[1];
+	if(la < 0){
+		lo = (lo + worldSize[1] / 2) % worldSize[1];
+		la = -la -1;
+	}else if(la >= worldSize[0]){
+		lo = (lo + worldSize[1] / 2) % worldSize[1];
+		la = worldSize[0]-(la-worldSize[0]+1);
+	}
+	la = (la + worldSize[0]) % worldSize[0];
+	lo = (lo + worldSize[1]) % worldSize[1];
+	dim3 out(la, lo, 0);
+	return out;
+}
+
 __device__ void rotVec3AboutZ(vec3 &vec, float yaw){
 	double nx = vec.x*cos(yaw) - vec.y*sin(yaw);
 	double ny = vec.x*sin(yaw) + vec.y*cos(yaw);
@@ -255,17 +271,12 @@ __global__ void calcWind(
 					if(al < 0) continue;
 					if(al >= worldSize[2]) continue;
 
+
 					int la = pos.x+dlat;
 					int lo = pos.y+dlon % worldSize[1];
-					if(la < 0){
-						lo = (lo + worldSize[1] / 2) % worldSize[1];
-						la = -la;
-					}else if(la >= worldSize[0]){
-						lo = (lo + worldSize[1] / 2) % worldSize[1];
-						la = worldSize[0]-(la-worldSize[0]+1);
-					}
-					la = (la + worldSize[0]) % worldSize[0];
-					lo = (lo + worldSize[1]) % worldSize[1];
+					dim3 wrapped = wrapCoords(la, lo, worldSize);
+					la = wrapped.x;
+					lo = wrapped.y;
 
 					float distanceFactor = manhtDist==1? 1 :
 							 (manhtDist==2? sqrt2 : sqrt3);

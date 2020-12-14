@@ -38,7 +38,7 @@ public class TerrainGenerator {
 				globe.altitudeDivisions
 		});
 		try(
-				CudaInt2   groundType= new CudaInt2(globe.latitudeDivisions, globe.longitudeDivisions);
+				CudaInt2   groundType= new CudaInt2(  globe.latitudeDivisions, globe.longitudeDivisions);
 				CudaFloat2 elevation = new CudaFloat2(globe.latitudeDivisions, globe.longitudeDivisions);
 		){
 			
@@ -65,6 +65,7 @@ public class TerrainGenerator {
 			JCudaDriver.cuCtxSynchronize();
 			groundType.pull(globe.groundType);
 			elevation.pull(globe.elevation);
+			System.out.println("Generation complete");
 		}finally {
 			JCudaDriver.cuMemFree(worldSizePtr);
 			JCudaDriver.cuModuleUnload(module);

@@ -1,0 +1,1 @@
+C:\Users\TheIncgi\Programs\java\jdk-15.0.1\bin\java.exe -jar --enable-preview --module-path C:\Users\TheIncgi\Programs\java\javafx-sdk-11.0.2\lib --add-modules=javafx.controls -Xmx9G test.jar 
