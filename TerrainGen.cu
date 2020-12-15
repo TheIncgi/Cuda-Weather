@@ -11,6 +11,15 @@ float __constant__ HALF_C = 3.14159654/180;
 float __constant__ sqrt2  = 1.41421356237;
 float __constant__ sqrt3  = 1.73205080757;
 
+int __constant__ SAND     = 0;
+int __constant__ DIRT     = 1;
+int __constant__ OCEAN    = 2;
+int __constant__ GRASS    = 3; //promoted from dirt in low rain, dry climates
+int __constant__ STONE    = 4;
+int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
+int __constant__ FOREST   = 6; //promoted from dirt, humid climates
+int __constant__ LAKE     = 7; //local minima of rainy areas
+
 struct vec2{
 	float x, y;
 };
@@ -168,38 +177,36 @@ __device__ float perlin(int x, int y, double scale, float offsetX, float offsetY
 	return perlin(dx, dy, wrapTop, wrapBottom, wrapWidth, 2*worldSize[0]/scale);
 }
 
-__device__ int countNeighbors(int lat, int lon, int dirLat, int dirLon, int* worldSize, int** ground, int matchTypeA, int matchTypeB, int depth){
+__device__ int countLakeR(int lat, int lon, int dx, int dy, int* worldSize, int depth, int maxDepth, int**groundType){
+	if(depth >= maxDepth) return maxDepth;
 	dim3 pos = wrapCoords(lat, lon, worldSize);
-	lat = pos.x;
-	lon = pos.y;
+	int type = groundType[pos.x][pos.y];
 
-	int g = ground[lat][lon]; //read once incase of edit on other thread
-	int matches = (g == matchTypeA || g == matchTypeB) ? 1 : 0;
-	if(matches == 0) return 0;
-	if(depth <= 0) return 1;
-	bool start = dirLat==0 && dirLon==0;
+	if(type != OCEAN && type != LAKE) return depth-1;
+	int m = 0;
+	if(dx!=-1)
+		m = max(m, countLakeR(lat+1, lon,   1, dy, worldSize, depth+1, maxDepth, groundType));
+	if(dx!=1)
+		m = max(m, countLakeR(lat-1, lon,   -1, dy, worldSize, depth+1, maxDepth, groundType));
 
-	if(start || dirLat==1)
-		matches += countNeighbors(lat+1, lon  ,  1,  0, worldSize, ground, matchTypeA, matchTypeB, depth-1);
-	if(start || dirLat==-1)
-		matches += countNeighbors(lat-1, lon  , -1,  0, worldSize, ground, matchTypeA, matchTypeB, depth-1);
-	if(start || dirLon== 1 || (dirLon==0 && dirLat!=0))
-		matches += countNeighbors(lat+0, lon+1,  0,  1, worldSize, ground, matchTypeA, matchTypeB, depth-1);
-	if(start || dirLon==-1 || (dirLat==0 && dirLat!=0))
-	    matches += countNeighbors(lat  , lon-1,  0, -1, worldSize, ground, matchTypeA, matchTypeB, depth-1);
+	if(dy!=-1)
+		m = max(m, countLakeR(lat  , lon+1, dx, 1, worldSize, depth+1, maxDepth, groundType));
+	if(dy!=1)
+		m = max(m, countLakeR(lat  , lon-1, dx, -1, worldSize, depth+1, maxDepth, groundType));
 
-	return matches;
+	return m;
+}
+__device__ int countLake(int lat, int lon, int* worldSize, int depth, int** groundType){
+	int m = 0;
+	m = max(m, countLakeR(lat, lon  ,  1, 0, worldSize, 0, depth, groundType));
+	m = max(m, countLakeR(lat, lon  , -1, 0, worldSize, 0, depth, groundType));
+	m = max(m, countLakeR(lat,   lon,  0, 1, worldSize, 0, depth, groundType));
+	m = max(m, countLakeR(lat,   lon,  0,-1, worldSize, 0, depth, groundType));
+	return m;
 }
 
 ////////////// Host functions ////////////////
-int __constant__ SAND     = 0;
-int __constant__ DIRT     = 1;
-int __constant__ OCEAN    = 2;
-int __constant__ GRASS    = 3; //promoted from dirt in low rain, dry climates
-int __constant__ STONE    = 4;
-int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
-int __constant__ FOREST   = 6; //promoted from dirt, humid climates
-int __constant__ LAKE     = 7; //local minima of rainy areas
+
 
 extern "C"
 __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
@@ -272,7 +279,7 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
 		int thresh = ceil(pow(ceil(worldSize[0] * 0.05),2));
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
 		if(groundType[pos.x][pos.y]==OCEAN){
-			int matches = countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, LAKE, OCEAN, thresh+1);
+			int matches = countLake(pos.x, pos.y, worldSize, 12, groundType);//countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, LAKE, OCEAN, thresh+1);
 			elevation[pos.x][pos.y] = matches;
 			if(matches < thresh)
 				groundType[pos.x][pos.y] = LAKE;
