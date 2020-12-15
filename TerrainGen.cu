@@ -291,30 +291,34 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 //		p *= 1 - 1 / ( 1 + pow(abs(90/deadZone-abs(latitude)/deadZone), 4) );
 
 		int gt = 0;
+		float e = 0;
 		if(p<.6) {
 			if(/*abs(latitude) > 78 &&*/ iceyP>.4) {
 				gt = ICE;
+				e = map(p, 0, .6, 0,1);
 			}else {
 				gt = OCEAN; //about 71% of the earth's surface is water
+				e = map(p, 0, .6, -.5, -.01);
 			}
 		}
-		else if(p<.65) gt = SAND;
-		else if(p<.9) gt = DIRT;
-		else           gt = STONE;
+		else if(p<.65){
+			gt = SAND;
+			e = map(p, .6, .65, 0, .05);
+		}else if(p<.9) {
+			gt = DIRT;
+			e = map(p, .65, .9, .05, 3);
+		}else {
+			gt = STONE;
+			e = map(p, .9, 1, 3, 6);
+		}
 
 		groundType[pos.x][pos.y] = gt;
 
-		float e = 0;
-		if(p<.5)
-			e = map(p, 0, .71, -.5, 0);
-		else if(p<.52)
-			e = map(p, .71, .85, 0, 1);
-		else if(p<.68)
-			e = map(p, .85, .95, 1, 3);
-		else
-			e = map(p, .95, 1, 3, 6);
+
+
+
 		e*= 1000;
-		elevation[pos.x][pos.y] = p*1000;
+		elevation[pos.x][pos.y] = e;
 	}
 }
 
@@ -332,7 +336,7 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
 		if(groundType[pos.x][pos.y]==OCEAN){
 			int matches = countLake(pos.x, pos.y, worldSize, thresh+1, groundType);//countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, LAKE, OCEAN, thresh+1);
-			elevation[pos.x][pos.y] = matches;
+			//elevation[pos.x][pos.y] = matches;
 			if(matches < thresh)
 				groundType[pos.x][pos.y] = LAKE;
 		}
