@@ -276,7 +276,12 @@ __global__ void copy(
     }
 }
 
-
+//http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
+//thanks google
+extern "C"
+__global__ void solarHeating() {}
+extern "C"
+__global__ void infraredCooling() {}
 extern "C"
 __global__ void calcWind(
 		//static
