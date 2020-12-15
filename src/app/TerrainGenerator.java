@@ -48,24 +48,32 @@ public class TerrainGenerator {
 					elevation.getArgPointer()
 			);
 			
-			int blockSizeX = 256;
-			long gridSizeX_groundOnly     = (long)Math.ceil((double)(globe.groundCells()) / blockSizeX);
-			double blocksNeeded = gridSizeX_groundOnly;
+			int blockSizeX1 = 256;
+			int blockSizeX2 = 4;
+			long gridSizeX_groundOnly1     = (long)Math.ceil((double)(globe.groundCells()) / blockSizeX1);
+			long gridSizeX_groundOnly2     = (long)Math.ceil((double)(globe.groundCells()) / blockSizeX2);
+			double blocksNeeded1 = gridSizeX_groundOnly1;
+			double blocksNeeded2 = gridSizeX_groundOnly2;
 			
 			int dimLimit = 65535;
-			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
-			if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+			int dim1 = (int) Math.ceil(Math.pow(blocksNeeded1, 1/3d));
+			int dim2 = (int) Math.ceil(Math.pow(blocksNeeded2, 1/3d));
+			if(dim1 > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim1+"^3 vs limit 65535^3)");
+			if(dim2 > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim2+"^3 vs limit 65535^3)");
 			tell("Generating ground...", -1);
 			JCudaDriver.cuCtxSynchronize();
 			JCudaDriver.cuLaunchKernel(groundFunc,
-					dim, dim, dim, blockSizeX, 1, 1, 0, null, kernel, null);
+					dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();
 			JCudaDriver.cuLaunchKernel(lakeFunc,
-					dim, dim, dim, blockSizeX, 1, 1, 0, null, kernel, null);
+					dim2, dim2, dim2, blockSizeX2, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();
 			groundType.pull(globe.groundType);
 			elevation.pull(globe.elevation);
+			JCudaDriver.cuCtxSynchronize();
 			System.out.println("Generation complete");
+		}catch (Exception e) {
+			e.printStackTrace();
 		}finally {
 			JCudaDriver.cuMemFree(worldSizePtr);
 			JCudaDriver.cuModuleUnload(module);

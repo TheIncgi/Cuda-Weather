@@ -4,6 +4,7 @@
 #define __shared__
 #endif
 #include "math.h"
+#include "List.h"
 
 float __constant__ PI     = 3.14159654;
 float __constant__ E      = 2.71828182846;
@@ -26,6 +27,13 @@ struct vec2{
 struct vec3{
 	float x, y,z;
 };
+struct dim2{
+	int x,y;
+};
+__device__ bool operator==(const dim2& lhs, const dim2& rhs)
+{
+    return lhs.x == rhs.x && lhs.y == rhs.y;
+}
 
 //cuda related
 __device__ int getThreadsPerBlock(){
@@ -55,7 +63,7 @@ __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	return dim3(latitude, longitude, altitude);
 }
 
-__device__ dim3 wrapCoords(int x, int y, int* worldSize){
+__device__ dim2 wrapCoords(int x, int y, int* worldSize){
 	int la = x;
 	int lo = y % worldSize[1];
 	if(la < 0){
@@ -67,7 +75,7 @@ __device__ dim3 wrapCoords(int x, int y, int* worldSize){
 	}
 	la = (la + worldSize[0]) % worldSize[0];
 	lo = (lo + worldSize[1]) % worldSize[1];
-	dim3 out(la, lo, 0);
+	dim2 out = {la, lo};
 	return out;
 }
 
@@ -179,30 +187,73 @@ __device__ float perlin(int x, int y, double scale, float offsetX, float offsetY
 
 __device__ int countLakeR(int lat, int lon, int dx, int dy, int* worldSize, int depth, int maxDepth, int**groundType){
 	if(depth >= maxDepth) return maxDepth;
-	dim3 pos = wrapCoords(lat, lon, worldSize);
-	int type = groundType[pos.x][pos.y];
+	dim2 pos = wrapCoords(lat, lon, worldSize);
+	int type = OCEAN; //groundType[pos.x][pos.y];
 
 	if(type != OCEAN && type != LAKE) return depth-1;
-	int m = 0;
-	if(dx!=-1)
-		m = max(m, countLakeR(lat+1, lon,   1, dy, worldSize, depth+1, maxDepth, groundType));
-	if(dx!=1)
-		m = max(m, countLakeR(lat-1, lon,   -1, dy, worldSize, depth+1, maxDepth, groundType));
 
-	if(dy!=-1)
-		m = max(m, countLakeR(lat  , lon+1, dx, 1, worldSize, depth+1, maxDepth, groundType));
-	if(dy!=1)
-		m = max(m, countLakeR(lat  , lon-1, dx, -1, worldSize, depth+1, maxDepth, groundType));
+	//if(depth>15) return depth-1;
+
+	dim2 posNext= {pos.x, pos.y};
+	int nextType = type;
+	while(nextType != OCEAN && nextType != LAKE){
+		pos = {posNext.x, posNext.y};
+		posNext = wrapCoords(posNext.x+dx, posNext.y+dy, worldSize);
+		type = OCEAN; //groundType[posNext.x][posNext.y];
+		depth++;
+		if(depth >= maxDepth) return maxDepth;
+	}
+
+
+	int m = 0;
+	if(dx==1)
+		m = max(m, countLakeR(pos.x+1, pos.y,   1, dy, worldSize, depth+1, maxDepth, groundType));
+	if(dx==-1)
+		m = max(m, countLakeR(pos.x-1, pos.y,  -1, dy, worldSize, depth+1, maxDepth, groundType));
+
+	if(dy==1)
+		m = max(m, countLakeR(pos.x  , pos.y+1, dx, 1, worldSize, depth+1, maxDepth, groundType));
+	if(dy==-1)
+		m = max(m, countLakeR(pos.x  , pos.y-1, dx, -1, worldSize, depth+1, maxDepth, groundType));
 
 	return m;
 }
 __device__ int countLake(int lat, int lon, int* worldSize, int depth, int** groundType){
 	int m = 0;
-	m = max(m, countLakeR(lat, lon  ,  1, 0, worldSize, 0, depth, groundType));
-	m = max(m, countLakeR(lat, lon  , -1, 0, worldSize, 0, depth, groundType));
-	m = max(m, countLakeR(lat,   lon,  0, 1, worldSize, 0, depth, groundType));
-	m = max(m, countLakeR(lat,   lon,  0,-1, worldSize, 0, depth, groundType));
+	List<dim2> open(depth);
+	List<dim2> closed(depth);
+	dim2 pos = {lat, lon};
+	dim2 pos2;
+	open.push(pos);
+	while(open.size() > 0){
+		pos = open.pop();
+		closed.push(pos);
+		int gt = groundType[pos.x][pos.y];
+		if(gt==LAKE || gt==OCEAN)
+			m++;
+		else
+			continue;
+		pos2 = wrapCoords(pos.x+1, pos.y, worldSize);
+		if(!closed.contains(pos2))
+			open.push(pos2);
+		pos2 = wrapCoords(pos.x-1, pos.y, worldSize);
+		if(!closed.contains(pos2))
+			open.push(pos2);
+		pos2 = wrapCoords(pos.x, pos.y+1, worldSize);
+		if(!closed.contains(pos2))
+			open.push(pos2);
+		pos2 = wrapCoords(pos.x, pos.y-1, worldSize);
+		if(!closed.contains(pos2))
+			open.push(pos2);
+		if(m>depth) return depth;
+	}
 	return m;
+	//return test[0];
+	//return m+countLake(lat, lon, worldSize, depth, groundType);
+//	m = max(m, countLakeR(lat, lon  ,  1, 0, worldSize, 0, depth, groundType));
+//	m = max(m, countLakeR(lat, lon  , -1, 0, worldSize, 0, depth, groundType));
+//	m = max(m, countLakeR(lat,   lon,  0, 1, worldSize, 0, depth, groundType));
+//	m = max(m, countLakeR(lat,   lon,  0,-1, worldSize, 0, depth, groundType));
 }
 
 ////////////// Host functions ////////////////
@@ -276,10 +327,11 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 
 	if (i<n) {
-		int thresh = ceil(pow(ceil(worldSize[0] * 0.05),2));
+		int thresh = ceil(pow(ceil(worldSize[0] * 0.15),2));
+
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
 		if(groundType[pos.x][pos.y]==OCEAN){
-			int matches = countLake(pos.x, pos.y, worldSize, 12, groundType);//countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, LAKE, OCEAN, thresh+1);
+			int matches = countLake(pos.x, pos.y, worldSize, thresh+1, groundType);//countNeighbors(pos.x, pos.y, 0, 0, worldSize, groundType, LAKE, OCEAN, thresh+1);
 			elevation[pos.x][pos.y] = matches;
 			if(matches < thresh)
 				groundType[pos.x][pos.y] = LAKE;
