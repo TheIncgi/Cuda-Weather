@@ -309,7 +309,7 @@ public class Simulator implements AutoCloseable{
 		this.progressListener = Optional.ofNullable(progressListener);
 	}
 	private void progress(double i, String status) {
-		System.out.printf("Simulation - %f%% - %s", i ,status);
+		System.out.printf("Simulation - %f%% - %s\n", i ,status);
 		progressListener.ifPresent(p->p.accept(i, status));
 	}
 

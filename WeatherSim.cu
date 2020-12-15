@@ -10,6 +10,9 @@ float __constant__ E      = 2.71828182846;
 float __constant__ HALF_C = 3.14159654/180;
 float __constant__ sqrt2  = 1.41421356237;
 float __constant__ sqrt3  = 1.73205080757;
+float __constant__ PLANET_RADIUS = 6371; //km
+float __constant__ PLANET_MASS   = 5.972e24; //kg ...that's 5 septillion
+float __constant__ GRAVITATIONAL_CONSTANT = 6.67E-11;
 
 struct vec3{
 	float x, y,z;
@@ -94,13 +97,22 @@ __device__ float distance(vec3 a, vec3 b){
 	return sqrt( dx*dx + dy*dy + dz*dz );
 }
 //polar to cartesian
-__device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude){
-	float yaw = (float) (360.0 * longitude / worldSize[1]);
-	float pitch = (float) (180.0 * latitude / worldSize[0] -90.0);
-	vec3 p = {6371 + altitudeOfIndex(altitude, worldSize), 0, 0};
+__device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude, bool center){
+	float yaw = (float) (360.0 * (longitude + 0.5) / worldSize[1]);
+	float pitch = (float) (180.0 * (latitude + 0.5) / worldSize[0] -90.0);
+	vec3 p = {PLANET_RADIUS + altitudeOfIndex(altitude, worldSize), 0, 0};
 	rotateVec3AboutY(p, pitch * HALF_C);
 	rotVec3AboutZ(p, yaw * HALF_C);
 	return p;
+}
+__device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude){
+	return mapTo3D(worldSize, latitude, longitude, altitude, false);
+}
+/**Distance between the center of two grid points*/
+__device__ float surfaceDistance(int lat1, int lon1, int alt1, int lat2, int lon2, int alt2, int* worldSize){
+	vec3 a = mapTo3D(worldSize, lat1, lon1, alt1, true);
+	vec3 b = mapTo3D(worldSize, lat2, lon2, alt2, true);
+	return distance(a,b);
 }
 __device__ float surfaceAreaAt(int* worldSize, int latitude, int altitude){
 	vec3 a = mapTo3D(worldSize, latitude,   0, altitude);
@@ -138,6 +150,13 @@ __device__ float maxWaterHeld(float temp){
 			) ) ;
 }
 
+//altitude provided as index
+__device__ float gravityAccel(int altitude, int* worldSize){
+	float r =  altitudeOfIndex(altitude, worldSize) + PLANET_RADIUS * 1000; //in meters
+
+	return GRAVITATIONAL_CONSTANT * ( PLANET_MASS ) / (r*r);
+}
+
 /**
  * Calculates the mass of an air volume in kg
  * */
@@ -171,7 +190,7 @@ __global__ void initAtmosphere(
 		float alt = map(pos.z, 0, worldSize[2], 0, 1);
 		pressureOut[pos.x][pos.y][pos.z] = map(alt, 0, 1, 1.02, 0.197385);
 		float lat = 180-(180*pos.x / (float)worldSize[0]) -90;
-		float maxTemp = map(alt,0, 1, 95, -40);
+		float maxTemp = map(alt,0, 1, 95, -50);
 		float minTemp = map(alt,0, 1, -40, -50);
 		tempOut[pos.x][pos.y][pos.z] = map(cos(abs(lat) * HALF_C), 0,1, minTemp, maxTemp);
 	}
@@ -273,23 +292,23 @@ __global__ void calcWind(
 
 
 					int la = pos.x+dlat;
-					int lo = pos.y+dlon % worldSize[1];
+					int lo = pos.y+dlon;
 					dim3 wrapped = wrapCoords(la, lo, worldSize);
 					la = wrapped.x;
 					lo = wrapped.y;
 
 					float distanceFactor = manhtDist==1? 1 :
-							 (manhtDist==2? sqrt2 : sqrt3);
+							 (manhtDist==2? sqrt2 : sqrt3) *surfaceDistance(pos.x, pos.y, pos.z, la, lo, al, worldSize) * 1000; //to meters
 
 					float presDiff = curPres - pressureIn[la][lo][al];
-					float volFactor = curVol / volumeAt(worldSize, la, al);
+					float volFactor = 1;//curVol / volumeAt(worldSize, la, al); //seemed like a good idea at the time, causes small amounts of force in a balanced system
 					float tempDiff = curTemp - temperatureIn[la][lo][al];
 
 					float forceMag = presDiff * volFactor * worldSpeed[2];
 					forceMag /= distanceFactor;
-					target.x += la * forceMag;
-					target.y += lo * forceMag;
-					target.z += al * forceMag + tempDiff * worldSpeed[2];//warm air above
+					target.x += dlat * forceMag * worldSpeed[2];
+					target.y += dlon * forceMag * worldSpeed[2];
+					target.z += (dalt * forceMag + tempDiff) * worldSpeed[2];//warm air above
 					//TODO forces from other pushing / pulling pressures
 					//pressure at altitudes
 					//ground type friction
@@ -301,8 +320,8 @@ __global__ void calcWind(
 		//f = ma
 		//a = f/m
 
-		windSpeedOut[pos.x][pos.y][pos.z*3  ] = mass;//windSpeedIn[pos.x][pos.y][pos.z][0] + target.x / mass;
+		windSpeedOut[pos.x][pos.y][pos.z*3  ] = target.x;//windSpeedIn[pos.x][pos.y][pos.z][0] + target.x / mass;
 		windSpeedOut[pos.x][pos.y][pos.z*3+1] = target.y;//windSpeedIn[pos.x][pos.y][pos.z][1] + target.y / mass;
-		windSpeedOut[pos.x][pos.y][pos.z*3+2] = curVol;//windSpeedIn[pos.x][pos.y][pos.z*3+2] + target.z / mass;
+		windSpeedOut[pos.x][pos.y][pos.z*3+2] = target.z;//windSpeedIn[pos.x][pos.y][pos.z*3+2] + target.z / mass;
 	}
 }
