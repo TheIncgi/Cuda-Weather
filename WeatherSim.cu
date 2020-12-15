@@ -12,6 +12,7 @@ float __constant__ sqrt2  = 1.41421356237;
 float __constant__ sqrt3  = 1.73205080757;
 float __constant__ PLANET_RADIUS = 6371; //km
 float __constant__ PLANET_MASS   = 5.972e24; //kg ...that's 5 septillion
+float __constant__ PLANET_TILT   = 23.5;
 float __constant__ GRAVITATIONAL_CONSTANT = 6.67E-11;
 
 struct vec3{
@@ -46,6 +47,14 @@ __device__ int getGlobalThreadID(){
 //math
 __device__ float map(float x, float inMin, float inMax, float outMin, float outMax) {
 	return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+__device__ float clamp(float x, float low, float high){
+	if(high < low){
+		int t = low;
+		low = high;
+		high = t;
+	}
+	return x < low? low : (x > high ? high : x);
 }
 
 __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
@@ -95,6 +104,9 @@ __device__ float distance(vec3 a, vec3 b){
 	float dy = b.y-a.y;
 	float dz = b.z-a.z;
 	return sqrt( dx*dx + dy*dy + dz*dz );
+}
+__device__ float dot(vec3 a, vec3 b){
+	return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 //polar to cartesian
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude, bool center){
@@ -169,7 +181,21 @@ __device__ float airMass(float kmCubed, float temp, float relHumid){
 	return mass;
 }
 
+//you've got a pocket full of it?
+/*Calculates the brightness of sunshine in an area on a scale of 0 to 1*/
+__device__ float sunshine(int lat, int lon, int* worldSize, float* worldTime){
+	vec3 sun = {1, 0, 0};
+	float yaw = (float) (-360.0 * (lon ) / worldSize[1]);
+	float pitch = (float) (180.0 * (lat ) / worldSize[0] -90.0);
+	yaw += worldTime[0] * -360; //daily rotation
+	yaw += worldTime[1] * -360; //if the earth didn't rotate, it'd have 1 day every year
+	vec3 p = {1, 0, 0};
+	rotateVec3AboutY(p, pitch * HALF_C);
+	rotVec3AboutZ(p, yaw * HALF_C);
+	rotateVec3AboutY(p, PLANET_TILT * HALF_C * sin( worldTime[1]*360 * HALF_C ));
 
+	return clamp(dot(sun,p), 0, 1);
+}
 
 //Host accessable functions
 
