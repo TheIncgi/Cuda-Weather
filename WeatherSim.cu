@@ -338,8 +338,9 @@ __global__ void solarHeating(int lat, int lon, int* worldSize, float* worldTime,
 
 		float cloudPassthru = pow(.5, depth) * cloud;
 		float cloudRedirection = 1-cloudPassthru;
-		float cloudAbsorbtion = sun * 0.2;
-		float cloudReflection = sun * 0.8;
+		float cloudAlbedo = map(clamp(altitudeOfIndex(alt, worldSize), 2, 6), .5, .8);
+		float cloudAbsorbtion = sun * (1-cloudAlbedo);        //TODO checkme: adjusted based on altitude https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
+		float cloudReflection = sun * cloudAlbedo;
 		cloudPassthru *= sun;
 
 		//TODO heat clouds based on 1360 watts * cloudAbsorbtion
