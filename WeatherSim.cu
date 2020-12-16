@@ -392,7 +392,7 @@ __global__ void calcWind(
 		vec3 target {0,0,0};
 		for(int dlat = -1; dlat<=1; dlat++){
 			for(int dlon = -1; dlon<=1; dlon++){
-				for(int dalt = -1; dalt<=1; dalt++){
+				for(int dalt = -1; dalt<=1; dalt++){ //TODO ignore altitudes that are literally in the ground
 					int manhtDist = abs(dlat)+abs(dlon)+abs(dalt);
 					if(manhtDist==0) continue;
 
