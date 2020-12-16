@@ -14,6 +14,14 @@ float __constant__ PLANET_RADIUS = 6371; //km
 float __constant__ PLANET_MASS   = 5.972e24; //kg ...that's 5 septillion
 float __constant__ PLANET_TILT   = 23.5;
 float __constant__ GRAVITATIONAL_CONSTANT = 6.67E-11;
+int __constant__ SAND     = 0;
+int __constant__ DIRT     = 1;
+int __constant__ OCEAN    = 2;
+int __constant__ GRASS    = 3; //promoted from dirt in low rain, dry climates
+int __constant__ STONE    = 4;
+int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
+int __constant__ FOREST   = 6; //promoted from dirt, humid climates
+int __constant__ LAKE     = 7; //local minima of rainy areas
 
 struct vec3{
 	float x, y,z;
@@ -197,6 +205,22 @@ __device__ float sunshine(int lat, int lon, int* worldSize, float* worldTime){
 	return clamp(dot(sun,p), 0, 1);
 }
 
+//https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
+__device__ float groundReflectance(int groundType, float moisture){
+	float r = .3; //default value
+	switch(groundType){
+	case SAND:   r=.45;  break;
+	case DIRT:   r=.30;  break;
+	case OCEAN:  r=.75;  break;
+	case GRASS:  r=.15;  break;
+	case STONE:  r=.20;  break; //not in resource, best guess
+	case ICE:    r=.35;  break;
+	case FOREST: r=.10;  break;
+	case LAKE:   r=.85;  break; //made this slightly brighter than the ocean
+	}
+	return map(clamp(moisture,0,1), r, LAKE);//fully/over saturated areas form reflective puddles/flood zones
+}
+
 //Host accessable functions
 
 
@@ -279,7 +303,61 @@ __global__ void copy(
 //http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
 //thanks google
 extern "C"
-__global__ void solarHeating() {}
+__global__ void solarHeating(int lat, int lon, int* worldSize, float* worldTime, float*** cloudCover, float*** humdity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperature) {
+	//1,360 watts per square meter
+
+	// 8% backscatter from air                  30%      27%
+	// 19% absorbed by humidity dust and o3     70%
+
+	//  4% absorbed by clouds                   20%      21% avg cloud cover 67%
+	// 17% reflected from clouds                80%
+	//
+
+	// 46% absorbed by surface                  88.5%    52%
+	//  6% reflected by surface                 11.5%
+
+	float sun = sunshine(lat, lon, worldSize, worldTime);
+	float scatterLoss = pow(.92, 1/worldSize[2]); //8% loss over any world size after all altitude steps
+	float humidityAbosrbtion = pow(.81, 1/worldSize[2]);
+	for(int alt = worldSize[2]-1; alt>=0; alt++){
+		float volume = volumeAt(world, lat, alt);
+		float surface = surfaceAreaAt(worldSize, lat, alt);
+		float depth  = altitudeOfIndex(alt+1, worldSize) - altitudeOfIndex(alt, worldSize);
+		float cloud = cloudCover[lat][lon][alt];
+
+		//.5 is a guesstimate, no easily located data on cloud light absorbtion per km of depth
+		//value is on about a 1/3 of light making it to the ground if under a storm cloud and such clouds being around a KM thick
+		//value may change as simulations results differ
+
+		sun *= scatterLoss; //after 12km this should be about 8%
+
+		float humidityAbsorbtion =  1 - (1-humidityAbosrbtion * humidity[lat][lon][alt] * (1-cloud)); //not doubling up on absorbtion of clouds
+		sun *= humidityAbosrbtion;
+
+		//TODO heat air based on 1360 watts * humidityAbsorbtion
+
+		float cloudPassthru = pow(.5, depth) * cloud;
+		float cloudRedirection = 1-cloudPassthru;
+		float cloudAbsorbtion = sun * 0.2;
+		float cloudReflection = sun * 0.8;
+		cloudPassthru *= sun;
+
+		//TODO heat clouds based on 1360 watts * cloudAbsorbtion
+
+		if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
+			int ground = groundType[lat][lon];
+			float snow = snowCover[lat][lon];
+			float moisture = groundMoisture[lat][lon];
+			float groundReflectance = map(clamp(snow,0,1), groundReflectance(ground, moisture), groundReflectanceOf(ICE));
+			float groundAbsorbtion = 1-groundReflectance;
+
+			//TODO heat ground/low atmosphere by groundAbsorbtion * 1360 watts
+
+			break;
+		}
+	}
+
+}
 extern "C"
 __global__ void infraredCooling() {}
 extern "C"
