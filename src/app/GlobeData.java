@@ -178,14 +178,14 @@ public class GlobeData {
 	}
 	
 	public enum GroundType{
-		SAND,
-		DIRT,
-		OCEAN,
-		GRASS,
-		STONE,
-		ICE,
-		FOREST,
-		LAKE
+		SAND, //0
+		DIRT, //1
+		OCEAN,//2
+		GRASS,//3
+		STONE,//4
+		ICE,  //5
+		FOREST,//6
+		LAKE  //7
 	}
 
 	public long groundCells() {

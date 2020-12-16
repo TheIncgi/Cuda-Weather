@@ -151,6 +151,9 @@ __device__ float volumeAt(int* worldSize, int lat, int alt){
 __device__ float CtoF(float celcius){
 	return celcius * 9 / 5 + 32;
 }
+__device__ float FtoC(float f){
+	return (f-32) * 5/9;
+}
 
 /**aprox air density at temp kg per meter cubed*/
 __device__ float airDensity(float tempF){
@@ -209,16 +212,57 @@ __device__ float sunshine(int lat, int lon, int* worldSize, float* worldTime){
 __device__ float groundReflectance(int groundType, float moisture){
 	float r = .3; //default value
 	switch(groundType){
-	case SAND:   r=.45;  break;
-	case DIRT:   r=.30;  break;
-	case OCEAN:  r=.75;  break;
-	case GRASS:  r=.15;  break;
-	case STONE:  r=.20;  break; //not in resource, best guess
-	case ICE:    r=.35;  break;
-	case FOREST: r=.10;  break;
-	case LAKE:   r=.85;  break; //made this slightly brighter than the ocean
+	case 0:  /*sand  */   r=.45;  break;
+	case 1:  /*dirt  */   r=.30;  break;
+	case 2:  /*ocean */   r=.75;  break;
+	case 3:  /*grass */   r=.15;  break;
+	case 4:  /*stone */   r=.20;  break; //not in resource, best guess
+	case 5:  /*ice   */   r=.35;  break;
+	case 6:  /*forest*/   r=.10;  break;
+	case 7:  /*lake  */  r=.85;  break; //made this slightly brighter than the ocean
 	}
-	return map(clamp(moisture,0,1), r, LAKE);//fully/over saturated areas form reflective puddles/flood zones
+	return map(clamp(moisture,0,1), 0, 1, r, LAKE);//fully/over saturated areas form reflective puddles/flood zones
+}
+__device__ float specificHeatAir(float temp) {
+	return map(temp, CtoF(0), 70,.7171,  1); //TODO verify, not really a proper formula
+}
+__device__ float specificHeatTerrain(int ground, int moisture){
+	switch(ground){
+		case 0:   /*sand  */  return map(clamp(moisture, 0, 1), 0, 1, .2, 3);
+		case 1:   /*dirt  */  return map(clamp(moisture, 0, 1), 0, 1, .8, 2.52); //dry soil v wet mud
+		case 2:   /*ocean */  return 4.3; //overestimating for ocean depth or something
+		case 3:   /*grass */  return map(clamp(moisture, 0, 1), 0, 1, 1.8, 4); //
+		case 4:   /*stone */  return .8;  //sandstone or something https://www.engineeringtoolbox.com/specific-heat-capacity-d_391.html
+		case 5:   /*ice   */  return 2.04;
+		case 6:   /*forest*/  return map(clamp(moisture, 0, 1), 0, 1, 2.4, 4);  //birch wood, plants have lots of water, kinda have to guess a bit
+		case 7:   /*lake  */  return 4.18;
+	}
+	return 1;
+}
+__device__ float biomeMass( int ground, int moisture){
+	//surface area * .2m depth //another unclear thing
+	//TODO verify/alter mass used for heat storage
+	float kgPerCm = 1;
+	switch(ground){
+		case 0:  /*sand  */  kgPerCm = map(clamp(moisture, 0, 1), 0, 1, 1500, 1900);
+		case 1:  /*dirt  */  kgPerCm = map(clamp(moisture, 0, 1), 0, 1, 1200, 1700); //dry soil v wet mud
+		case 2:  /*ocean */  kgPerCm = 1000; //overestimating for ocean depth or something
+		case 3:  /*grass */  kgPerCm = map(clamp(moisture, 0, 1), 0, 1, 1400, 1700); // more guestimates
+		case 4:  /*stone */  kgPerCm = 2560;  //limestone https://www.engineeringtoolbox.com/dirt-mud-densities-d_1727.html
+		case 5:  /*ice   */  kgPerCm = 920;
+		case 6:  /*forest*/  kgPerCm = map(clamp(moisture, 0, 1), 0, 1, 1700, 1800);  //guestimates,
+		case 7:  /*lake  */  kgPerCm = 1000;
+	}
+	return kgPerCm;
+}
+//https://www.desmos.com/calculator/jut6bbsuw7
+//https://www.eng-tips.com/viewthread.cfm?qid=260422
+//temp is provided as F
+//cp is provided in J/KG C
+//
+__device__ float tempChange(float currentTemp, float seconds, float watts, float mass, float cp){
+	currentTemp = FtoC(currentTemp);
+	return CtoF( (seconds*watts)/(mass*cp) + currentTemp );
 }
 
 //Host accessable functions
@@ -303,7 +347,7 @@ __global__ void copy(
 //http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
 //thanks google
 extern "C"
-__global__ void solarHeating(int lat, int lon, int* worldSize, float* worldTime, float*** cloudCover, float*** humdity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperature) {
+__global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCover, float*** humidity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperatureIn, float*** temperatureOut) {
 	//1,360 watts per square meter
 
 	// 8% backscatter from air                  30%      27%
@@ -316,14 +360,25 @@ __global__ void solarHeating(int lat, int lon, int* worldSize, float* worldTime,
 	// 46% absorbed by surface                  88.5%    52%
 	//  6% reflected by surface                 11.5%
 
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	dim3 pos = getWorldCoords(i, worldSize);
+	if (i>=n) return;
+	int lat = pos.x;
+	int lon = pos.y;
+
+
+	const float SUN_WATTS = 1360;
 	float sun = sunshine(lat, lon, worldSize, worldTime);
-	float scatterLoss = pow(.92, 1/worldSize[2]); //8% loss over any world size after all altitude steps
+	float scatterLoss = pow(.92, 1/(worldSize[2])); //8% loss over any world size after all altitude steps
 	float humidityAbosrbtion = pow(.81, 1/worldSize[2]);
 	for(int alt = worldSize[2]-1; alt>=0; alt++){
-		float volume = volumeAt(world, lat, alt);
+		float appliedWatts = 0;
+		float volume = volumeAt(worldSize, lat, alt);
 		float surface = surfaceAreaAt(worldSize, lat, alt);
 		float depth  = altitudeOfIndex(alt+1, worldSize) - altitudeOfIndex(alt, worldSize);
 		float cloud = cloudCover[lat][lon][alt];
+		float mass = airMass(volume, temperatureIn[lat][lon][alt], humidity[lat][lon][alt]);
 
 		//.5 is a guesstimate, no easily located data on cloud light absorbtion per km of depth
 		//value is on about a 1/3 of light making it to the ground if under a storm cloud and such clouds being around a KM thick
@@ -335,32 +390,66 @@ __global__ void solarHeating(int lat, int lon, int* worldSize, float* worldTime,
 		sun *= humidityAbosrbtion;
 
 		//TODO heat air based on 1360 watts * humidityAbsorbtion
+		appliedWatts += humidityAbosrbtion * SUN_WATTS;
 
-		float cloudPassthru = pow(.5, depth) * cloud;
+		float cloudPassthru = pow((float).5, depth) * cloud;
 		float cloudRedirection = 1-cloudPassthru;
-		float cloudAlbedo = map(clamp(altitudeOfIndex(alt, worldSize), 2, 6), .5, .8);
+		float cloudAlbedo = map(clamp(altitudeOfIndex(alt, worldSize), 2, 6),2,6, .5, .8);
 		float cloudAbsorbtion = sun * (1-cloudAlbedo);        //TODO checkme: adjusted based on altitude https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
 		float cloudReflection = sun * cloudAlbedo;
 		cloudPassthru *= sun;
 
 		//TODO heat clouds based on 1360 watts * cloudAbsorbtion
-
+		appliedWatts += cloudAbsorbtion  * SUN_WATTS;
+		float cp = specificHeatAir(temperatureIn[lat][lon][alt]);
+		bool brk = false;
 		if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
 			int ground = groundType[lat][lon];
 			float snow = snowCover[lat][lon];
 			float moisture = groundMoisture[lat][lon];
-			float groundReflectance = map(clamp(snow,0,1), groundReflectance(ground, moisture), groundReflectanceOf(ICE));
-			float groundAbsorbtion = 1-groundReflectance;
+			float reflect = map(clamp(snow,0,1),0,1, groundReflectance(ground, moisture), .8);
+			float groundAbsorbtion = 1-reflect;
 
 			//TODO heat ground/low atmosphere by groundAbsorbtion * 1360 watts
-
-			break;
+			appliedWatts += groundAbsorbtion * SUN_WATTS;
+			mass += biomeMass(ground, moisture);
+			cp = specificHeatTerrain(ground, moisture);
+			brk = true;
 		}
+
+		temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldTime[2], appliedWatts, mass, cp);
+
+		if(brk)
+			break;
 	}
 
 }
 extern "C"
-__global__ void infraredCooling() {}
+__global__ void infraredCooling(int* worldSize, float* worldTime, int** groundType, float **elevation, float** groundMoisture, float*** humidity, float*** tempIn, float*** tempOut) {
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	dim3 pos = getWorldCoords(i, worldSize);
+	if (i>=n) return;
+	int lat = pos.x;
+	int lon = pos.y;
+	int alt = pos.z;
+
+	const float SUN_WATTS = 1360;
+	float GROUND_IR    = SUN_WATTS * 9;
+	float AIR_IR = pow(.6, 1/(worldSize[2]));
+
+	float vol = volumeAt(worldSize, lat, alt);
+	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt]);
+	float wattsIR = AIR_IR * SUN_WATTS;
+	float cp = specificHeatAir(tempIn[lat][lon][alt]);
+	if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
+		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
+		wattsIR += SUN_WATTS * .09;
+		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
+	}
+
+	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldTime[2], wattsIR, mass, cp);
+}
 extern "C"
 __global__ void calcWind(
 		//static
