@@ -16,7 +16,7 @@ public class WorldSizePicker extends Pane{
 	Optional<Consumer<Triplet<Integer, Integer, Integer>>> onSelect = Optional.empty();
 	int base = 48;
 	public WorldSizePicker() {
-		addOption("Mini",   new Triplet<>(base  , base*2, 5));
+		addOption("Mini",   new Triplet<>(base  , base*2, 20));
 		addOption("Small",  new Triplet<>(base*2, base*4, 50));
 		addOption("Medium", new Triplet<>(base*3, base*6, 70));
 		addOption("Big",    new Triplet<>(base*4, base*8, 75));

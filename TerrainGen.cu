@@ -290,6 +290,7 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 		p *= 1- zone(abs(latitude), 90, deadZone, 4);
 //		p *= 1 - 1 / ( 1 + pow(abs(90/deadZone-abs(latitude)/deadZone), 4) );
 
+		//p will range from 0 to a little less than 2
 		int gt = 0;
 		float e = 0;
 		if(p<.6) {
@@ -306,10 +307,10 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 			e = map(p, .6, .65, 0, .05);
 		}else if(p<.9) {
 			gt = DIRT;
-			e = map(p, .65, .9, .05, 3);
+			e = map(p, .65, .9, .05, 3/2);
 		}else {
 			gt = STONE;
-			e = map(p, .9, 1, 3, 6);
+			e = map(p, .9, 1, 3/2, 6/2);
 		}
 
 		groundType[pos.x][pos.y] = gt;

@@ -8,6 +8,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToolBar;
@@ -21,17 +22,20 @@ public class FxViewer extends Application{
 	
 	//GlobeData dummy = new GlobeData(1500, 2500, 50).random();
 	//GlobeViewer gv = new GlobeViewer(dummy);
+//	Button blindStep = new Button("Blind Step");
+	ComboBox<Integer> stepCount = new ComboBox<>();
 	Button timeStep = new Button("Step");
+	Button cancelButton = new Button("Cancel");
 	ProgressBar timestepProgress = new ProgressBar();
 	Label timeStepStatus = new Label("Not ready");
-	ToolBar simulationControls = new ToolBar(timeStep, timestepProgress, timeStepStatus);
+	ToolBar simulationControls = new ToolBar(new Label("Steps: "),stepCount, timeStep, timestepProgress, timeStepStatus, cancelButton);
 	Simulator simulator;
 	Thread bgThread;
 	GlobeData result;
 	
 	WorldSizePicker wsp = new WorldSizePicker();
 	
-	volatile boolean running = true;
+	volatile boolean running = true, cancel = false;
 	private boolean flag = false;
 	private volatile int timesteps = 0;
 	private Scene scene;
@@ -65,6 +69,9 @@ public class FxViewer extends Application{
 			scene.setRoot(lp);
 		});
 		
+		stepCount.getItems().addAll(1, 5, 10, 15, 20, 25, 30, 50, 100, 125, 150, 300, 500, 1000, 2000, 5000, 10000, 20000,25000,50000,75000,100000);
+		stepCount.getSelectionModel().select(0);
+		
 		timeStep.setOnAction(e->{
 			System.out.println("Triggering timestep");
 			flag = true;
@@ -73,11 +80,18 @@ public class FxViewer extends Application{
 				bgThread.notify();
 			}
 		});
+		cancelButton.setOnAction(e->{
+			cancel = true;
+			cancelButton.setDisable(true);
+		});
+		cancelButton.setVisible(false);
+		
 		timeStep.setDisable(true);
 		//timestepProgress.setVisible(false);
 		
 		stage.setOnCloseRequest(e->{
 			running = false;
+			cancel = true;
 			flag = false;
 			if(bgThread!=null)
 			synchronized (bgThread) {
@@ -102,11 +116,12 @@ public class FxViewer extends Application{
 			simulator = new Simulator(world);
 			System.out.println("  adding simulation listeners");
 			simulator.setProgressListener((prog, status)->{
-				Platform.runLater(()->{
-					timestepProgress.setProgress(prog);
-					timeStepStatus.setText(status);
-					//timestepProgress.setVisible(prog<1);
-				});
+				if(stepCount.getValue()==1)
+					Platform.runLater(()->{
+						timestepProgress.setProgress(prog);
+						timeStepStatus.setText(status);
+						//timestepProgress.setVisible(prog<1);
+					});
 			});
 			simulator.setOnStepComplete(()->{
 				Platform.runLater(()->{
@@ -132,8 +147,30 @@ public class FxViewer extends Application{
 					}
 					if(flag) {
 						flag = false;
-						long time = simulator.timeStep();
-						System.out.printf("Timestep %d took %d millis\n", ++timesteps, time);
+						cancel = false;
+						Platform.runLater(()->{
+							cancelButton.setVisible(true);
+							cancelButton.setDisable(false);
+						});
+						
+						long time = 0;
+						int limit = stepCount.getValue();
+						for(int i = 0; i < limit && running && !cancel; i++) {
+							time += simulator.timeStep( i == limit-1);
+							if(limit != 1) {
+								final int I = i;
+								Platform.runLater(()->{
+									timestepProgress.setProgress(I / (float)limit);
+									timeStepStatus.setText(String.format("Step %5d of %d", I+1, limit));
+								});
+							}
+						}
+						System.out.printf("Timestep"+(limit!=1? (stepCount.getValue()==1?"":"s"): "")+" %d took %d millis\n", ++timesteps, time);
+						if(limit!=1)
+							Platform.runLater(()->{
+								timeStepStatus.setText("Ready");
+								timestepProgress.setProgress(-1);
+							});
 					}
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();

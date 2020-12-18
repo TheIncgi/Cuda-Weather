@@ -205,7 +205,7 @@ __device__ float sunshine(int lat, int lon, int* worldSize, float* worldTime){
 	rotVec3AboutZ(p, yaw * HALF_C);
 	rotateVec3AboutY(p, PLANET_TILT * HALF_C * sin( worldTime[1]*360 * HALF_C ));
 
-	return clamp(dot(sun,p), 0, 1);
+	return clamp(dot(sun,p), 0, 1); //praise the sun
 }
 
 //https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
@@ -370,9 +370,10 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCov
 
 	const float SUN_WATTS = 1360;
 	float sun = sunshine(lat, lon, worldSize, worldTime);
+	//float rawSunshine = sun; //debug value
 	float scatterLoss = pow(.92, 1/(worldSize[2])); //8% loss over any world size after all altitude steps
-	float humidityAbosrbtion = pow(.81, 1/worldSize[2]);
-	for(int alt = worldSize[2]-1; alt>=0; alt++){
+	float humidityAbsorbtion = pow(.81, 1/worldSize[2]);
+	for(int alt = worldSize[2]-1; alt>=0; alt--){
 		float appliedWatts = 0;
 		float volume = volumeAt(worldSize, lat, alt);
 		float surface = surfaceAreaAt(worldSize, lat, alt);
@@ -386,24 +387,26 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCov
 
 		sun *= scatterLoss; //after 12km this should be about 8%
 
-		float humidityAbsorbtion =  1 - (1-humidityAbosrbtion * humidity[lat][lon][alt] * (1-cloud)); //not doubling up on absorbtion of clouds
-		sun *= humidityAbosrbtion;
+		float humidityAbsorbtionFactor =  1-((1-humidityAbsorbtion) * humidity[lat][lon][alt] * (1-cloud)); //not doubling up on absorbtion of clouds
+		//when humidity    is 0, this factor is 1,
+		//when cloud cover is 1, this factor is 1
+		sun *= humidityAbsorbtionFactor;
 
 		//TODO heat air based on 1360 watts * humidityAbsorbtion
-		appliedWatts += humidityAbosrbtion * SUN_WATTS;
+		appliedWatts += (1-humidityAbsorbtionFactor) * SUN_WATTS;
 
-		float cloudPassthru = pow((float).5, depth) * cloud;
-		float cloudRedirection = 1-cloudPassthru;
+		float cloudPassthru = 1-( (1-pow((float).5, depth)) * cloud); //light still sent down further
+		float cloudRedirection = 1-cloudPassthru;    // bounced or absorbed
 		float cloudAlbedo = map(clamp(altitudeOfIndex(alt, worldSize), 2, 6),2,6, .5, .8);
-		float cloudAbsorbtion = sun * (1-cloudAlbedo);        //TODO checkme: adjusted based on altitude https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
-		float cloudReflection = sun * cloudAlbedo;
-		cloudPassthru *= sun;
+		float cloudAbsorbtion = sun * (1-cloudAlbedo) * cloudRedirection;        //TODO checkme: adjusted based on altitude https://en.wikipedia.org/wiki/Albedo#/media/File:Albedo-e_hg.svg
+		//float cloudReflection = sun * cloudAlbedo * cloudRedirection; unused reflection amount
+		sun *= cloudPassthru;
 
-		//TODO heat clouds based on 1360 watts * cloudAbsorbtion
+		///TODO heat clouds based on 1360 watts * cloudAbsorbtion
 		appliedWatts += cloudAbsorbtion  * SUN_WATTS;
 		float cp = specificHeatAir(temperatureIn[lat][lon][alt]);
 		bool brk = false;
-		if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
+		if(alt==0 || altitudeOfIndex(alt, worldSize)*1000 <= elevation[lat][lon]){ //altitude is in KM, elevation is in meters!
 			int ground = groundType[lat][lon];
 			float snow = snowCover[lat][lon];
 			float moisture = groundMoisture[lat][lon];
@@ -411,7 +414,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCov
 			float groundAbsorbtion = 1-reflect;
 
 			//TODO heat ground/low atmosphere by groundAbsorbtion * 1360 watts
-			appliedWatts += groundAbsorbtion * SUN_WATTS;
+			appliedWatts += sun * groundAbsorbtion * SUN_WATTS;
 			mass += biomeMass(ground, moisture);
 			cp = specificHeatTerrain(ground, moisture);
 			brk = true;
@@ -419,8 +422,11 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCov
 
 		temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldTime[2], appliedWatts, mass, cp);
 
-		if(brk)
+		if(brk){
+			for(int g=alt; g>=0; g--)
+				temperatureOut[lat][lon][g] = temperatureOut[lat][lon][alt]; //set inground temp for ease of viewing in UI
 			break;
+		}
 	}
 
 }
@@ -430,25 +436,25 @@ __global__ void infraredCooling(int* worldSize, float* worldTime, int** groundTy
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 	dim3 pos = getWorldCoords(i, worldSize);
 	if (i>=n) return;
-	int lat = pos.x;
-	int lon = pos.y;
-	int alt = pos.z;
-
-	const float SUN_WATTS = 1360;
-	float GROUND_IR    = SUN_WATTS * 9;
-	float AIR_IR = pow(.6, 1/(worldSize[2]));
-
-	float vol = volumeAt(worldSize, lat, alt);
-	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt]);
-	float wattsIR = AIR_IR * SUN_WATTS;
-	float cp = specificHeatAir(tempIn[lat][lon][alt]);
-	if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
-		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
-		wattsIR += SUN_WATTS * .09;
-		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
-	}
-
-	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldTime[2], wattsIR, mass, cp);
+//	int lat = pos.x;
+//	int lon = pos.y;
+//	int alt = pos.z;
+//
+//	const float SUN_WATTS = 1360;
+//	float GROUND_IR    = SUN_WATTS * 9;
+//	float AIR_IR = pow(.6, 1/(worldSize[2]));
+//
+//	float vol = volumeAt(worldSize, lat, alt);
+//	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt]);
+//	float wattsIR = AIR_IR * SUN_WATTS;
+//	float cp = specificHeatAir(tempIn[lat][lon][alt]);
+//	if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
+//		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
+//		wattsIR += SUN_WATTS * .09;
+//		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
+//	}
+//
+//	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldTime[2], wattsIR, mass, cp);
 }
 extern "C"
 __global__ void calcWind(

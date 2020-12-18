@@ -22,7 +22,7 @@ public class Simulator implements AutoCloseable{
 	float worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
 	float worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
 	private Triplet<CUfunction, Boolean, Pointer> atmosphereInit;
-	private Triplet<CUfunction, Boolean, Pointer[]>[] funcs;
+	private Step[] funcs;
 	//constant
 	private CUdeviceptr worldSizePtr;
 	private CudaFloat1   worldSpeed; //not changed by CUfunction
@@ -66,8 +66,8 @@ public class Simulator implements AutoCloseable{
 						temperature[0].getArgPointer()
 						)
 		);
-		funcs = new Triplet[] {
-				new Triplet<>(getFunction(module, "copy"), true, new Pointer[] {
+		funcs = new Step[] {
+				new Step("Copy",getFunction(module, "copy"), true, new Pointer[] {
 						Pointer.to(
 							worldSize,
 							worldSpeed       .getArgPointer(),
@@ -112,7 +112,7 @@ public class Simulator implements AutoCloseable{
 								windSpeed     [0].getArgPointer()
 								)
 				}),
-				new Triplet<>(getFunction(module, "calcWind"), true, new Pointer[] {
+				new Step("Calcuate Wind",getFunction(module, "calcWind"), true, new Pointer[] {
 					Pointer.to(new Pointer[] {
 							worldSize,
 							worldSpeed     .getArgPointer(),
@@ -140,7 +140,7 @@ public class Simulator implements AutoCloseable{
 							worldTimePtr[0].getArgPointer(),
 							windSpeed   [0].getArgPointer()
 					})
-				}),new Triplet<>(getFunction(module, "solarHeating"), false, new Pointer[] {
+				}),new Step("Solar Heating",getFunction(module, "solarHeating"), false, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -166,7 +166,7 @@ public class Simulator implements AutoCloseable{
 								temperature[0].getArgPointer()
 						})
 				})
-				,new Triplet<>(getFunction(module, "infraredCooling"), true, new Pointer[] {
+				,new Step("Infared Cooling",getFunction(module, "infraredCooling"), true, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -294,7 +294,7 @@ public class Simulator implements AutoCloseable{
 	 * Results will be ready before this emthod unblocks
 	 * returns number of milliseconds elapsed
 	 * */
-	public synchronized long timeStep() {
+	public synchronized long timeStep(boolean pullResult) {
 		System.out.println("Begining timestep..");
 		long start = System.currentTimeMillis();
 		if(!dataLoaded) {
@@ -322,10 +322,10 @@ public class Simulator implements AutoCloseable{
 		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
 		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
 		for(int i = 0; i<funcs.length; i++) {
-			Triplet<CUfunction, Boolean, Pointer[]> step = funcs[i];
-			progress(i / funcs.length, "Step "+(i+1)+" of "+funcs.length);
-			CUfunction f = step.a;
-			double blocksNeeded = step.b? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
+			Step step = funcs[i];
+			progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName);
+			CUfunction f = step.function;
+			double blocksNeeded = step.is3DSpace? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
 			
 			int dimLimit = 65535;
 			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
@@ -335,18 +335,19 @@ public class Simulator implements AutoCloseable{
 			    dim,  dim, dim,      // Grid dimension 
 			    blockSizeX, 1, 1,      // Block dimension
 			    0, null,               // Shared memory size and stream 
-			    step.c[activeKernal], null // Kernel- and extra parameters
+			    step.args[activeKernal], null // Kernel- and extra parameters
 			); 
 			
 			JCudaDriver.cuCtxSynchronize();
 			
 		}
-		progress(1, "Pulling result");
-		pullResult(); //read from input side while also computing
-		progress(1, "Waiting for result");
-		JCudaDriver.cuCtxSynchronize();
-		onResultReady.run();
-		
+		if(pullResult) {
+			progress(1, "Pulling result");
+			pullResult(); //read from input side while also computing
+			progress(1, "Waiting for result");
+			JCudaDriver.cuCtxSynchronize();
+			onResultReady.run();
+		}
 		activeKernal = 1-activeKernal;
 		
 		if(onStepComplete!=null)
@@ -355,6 +356,8 @@ public class Simulator implements AutoCloseable{
 		progress(-1, "Ready");
 		return end-start;
 	}
+	
+	
 	
 	public void setProgressListener(BiConsumer<Double,String> progressListener) {
 		this.progressListener = Optional.ofNullable(progressListener);
@@ -406,6 +409,20 @@ public class Simulator implements AutoCloseable{
 		windSpeed[0].close();
 		windSpeed[1].close();
 		JCudaDriver.cuModuleUnload(module);
+	}
+	
+	private class Step {
+		String stepName;
+		CUfunction function;
+		Pointer[] args;
+		boolean is3DSpace;
+		
+		public Step(String step, CUfunction function, boolean is3DSpace, Pointer[] argSets) {
+			this.stepName = step;
+			this.function = function;
+			this.is3DSpace = is3DSpace;
+			this.args = argSets;
+		}
 	}
 	
 	/*
