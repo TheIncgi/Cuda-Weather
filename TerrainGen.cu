@@ -110,7 +110,9 @@ __device__ float smoothstep(float a0, float a1, float w){
     float value = w*w*w*(w*(w*6 - 15) + 10);
     return a0 + value*(a1 - a0);
 }
-//from the wiki https://en.wikipedia.org/wiki/Perlin_noise
+
+//based on this https://en.wikipedia.org/wiki/Perlin_noise
+//modified to create wrapping while still allowing offsets for seed
 __device__ vec2 randomGradient(int ix, int iy) {
     // Random float. No precomputed gradients mean this works for any number of grid coordinates
     float random = 2920.f * sin(ix * 21942.f + iy * 171324.f + 8912.f) * cos(ix * 23157.f * iy * 217832.f + 9758.f);

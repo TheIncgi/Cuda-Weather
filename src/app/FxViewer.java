@@ -123,11 +123,7 @@ public class FxViewer extends Application{
 						//timestepProgress.setVisible(prog<1);
 					});
 			});
-			simulator.setOnStepComplete(()->{
-				Platform.runLater(()->{
-					timeStep.setDisable(false);
-				});
-			});
+			
 			simulator.setOnResultReady(()->{
 				Platform.runLater(()->{
 					gv.updateOverlays();
@@ -156,7 +152,6 @@ public class FxViewer extends Application{
 						long time = 0;
 						int limit = stepCount.getValue();
 						for(int i = 0; i < limit && running && !cancel; i++) {
-							time += simulator.timeStep( i == limit-1);
 							if(limit != 1) {
 								final int I = i;
 								Platform.runLater(()->{
@@ -164,10 +159,12 @@ public class FxViewer extends Application{
 									timeStepStatus.setText(String.format("Step %5d of %d", I+1, limit));
 								});
 							}
+							time += simulator.timeStep( i == limit-1);
 						}
 						System.out.printf("Timestep"+(limit!=1? (stepCount.getValue()==1?"":"s"): "")+" %d took %d millis\n", ++timesteps, time);
-						if(limit!=1)
+//						if(limit!=1)
 							Platform.runLater(()->{
+								timeStep.setDisable(false);
 								timeStepStatus.setText("Ready");
 								timestepProgress.setProgress(-1);
 							});

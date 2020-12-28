@@ -155,9 +155,17 @@ __device__ float FtoC(float f){
 	return (f-32) * 5/9;
 }
 
-/**aprox air density at temp kg per meter cubed*/
-__device__ float airDensity(float tempF){
-	return tempF * -.0026 + 1.38;
+/**aprox air density at temp kg per meter cubed
+ * https://www.desmos.com/calculator/5ziykdrgdq
+ * */
+__device__ float airDensity(float tempF, float relHumid, float pressureAtmos){
+	float tempC = FtoC(tempF);
+	float tempK = tempC + 273.15;
+	float pSat = 10 * 610.78 * pow(10.0, (7.5*tempC)/(tempC+237.3) ); //desmos #10
+	float pv = relHumid - pSat;
+	float pd = 101325 * pressureAtmos - pv; //to Pa
+
+	return clamp( (pd * 0.0289654 + pv * 0.018016) / (8.314 * tempK), 0.5, 1.5); //formula is only accurate in -10 to 50 c, clamping before values get crazy
 }
 
 //https://www.desmos.com/calculator/gzqcdksdhs
@@ -183,8 +191,8 @@ __device__ float gravityAccel(int altitude, int* worldSize){
 /**
  * Calculates the mass of an air volume in kg
  * */
-__device__ float airMass(float kmCubed, float temp, float relHumid){
-	float mass = airDensity(temp) * kmCubed; //mass of air
+__device__ float airMass(float kmCubed, float temp, float relHumid, float pressureAtmos){
+	float mass = airDensity(temp, relHumid, pressureAtmos) * kmCubed; //mass of air
 	//1 billion cubic meters in 1 cubic km
 	//divide 1000 because maxWater is returned in grams
 	//operations cancled out to * 1M
@@ -347,9 +355,10 @@ __global__ void copy(
 //http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
 //thanks google
 extern "C"
-__global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed, float*** cloudCover, float*** humidity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperatureIn, float*** temperatureOut) {
+__global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed, float*** pressure, float*** cloudCover, float*** humidity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperatureIn, float*** temperatureOut) {
 	//1,360 watts per square meter
 
+	//TODO consider changing rates based on air pressure/density
 	// 8% backscatter from air                  30%      27%
 	// 19% absorbed by humidity dust and o3     70%
 
@@ -379,7 +388,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 		float surface = surfaceAreaAt(worldSize, lat, alt);
 		float depth  = altitudeOfIndex(alt+1, worldSize) - altitudeOfIndex(alt, worldSize);
 		float cloud = cloudCover[lat][lon][alt];
-		float mass = airMass(volume, temperatureIn[lat][lon][alt], humidity[lat][lon][alt]);
+		float mass = airMass(volume, temperatureIn[lat][lon][alt], humidity[lat][lon][alt], pressure[lat][lon][alt]);
 
 		//.5 is a guesstimate, no easily located data on cloud light absorbtion per km of depth
 		//value is on about a 1/3 of light making it to the ground if under a storm cloud and such clouds being around a KM thick
@@ -420,7 +429,10 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 			brk = true;
 		}
 
-		temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts, mass, cp);
+		if(mass < 0)
+			temperatureOut[lat][lon][alt] = -95525;
+		else
+			temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts, mass, cp);
 
 		if(brk){
 			for(int g=alt; g>=0; g--)
@@ -521,7 +533,7 @@ __global__ void calcWind(
 				}
 			}
 		}
-		float mass = airMass(curVol, curTemp, curHumid);
+		float mass = airMass(curVol, curTemp, curHumid, curPres);
 		//f = ma
 		//a = f/m
 
