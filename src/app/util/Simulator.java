@@ -144,6 +144,7 @@ public class Simulator implements AutoCloseable{
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
+								worldSpeed.getArgPointer(),
 								cloudCover[0].getArgPointer(),
 								humidity[0].getArgPointer(),
 								groundType.getArgPointer(),
@@ -156,6 +157,7 @@ public class Simulator implements AutoCloseable{
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[1].getArgPointer(),
+								worldSpeed.getArgPointer(),
 								cloudCover[1].getArgPointer(),
 								humidity[1].getArgPointer(),
 								groundType.getArgPointer(),
@@ -295,17 +297,17 @@ public class Simulator implements AutoCloseable{
 	 * returns number of milliseconds elapsed
 	 * */
 	public synchronized long timeStep(boolean pullResult) {
-		System.out.println("Begining timestep..");
+		//System.out.println("Begining timestep..");
 		long start = System.currentTimeMillis();
 		if(!dataLoaded) {
-			progress(0, "Pushing data");
+			progress(0, "Pushing data", false);
 			pushData();
 			JCudaDriver.cuCtxSynchronize();
 			dataLoaded = true;
 		}
 		
 		if(!in.isInitalized()) {
-			progress(0, "Initalizing atmosphere");
+			progress(0, "Initalizing atmosphere", false);
 			initAtmosphere();
 			in.markInitalized();
 		}
@@ -323,7 +325,7 @@ public class Simulator implements AutoCloseable{
 		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
 		for(int i = 0; i<funcs.length; i++) {
 			Step step = funcs[i];
-			progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName);
+			progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName, !pullResult);
 			CUfunction f = step.function;
 			double blocksNeeded = step.is3DSpace? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
 			
@@ -342,9 +344,10 @@ public class Simulator implements AutoCloseable{
 			
 		}
 		if(pullResult) {
-			progress(1, "Pulling result");
+			JCudaDriver.cuCtxSynchronize();
+			progress(1, "Pulling result", !pullResult);
 			pullResult(); //read from input side while also computing
-			progress(1, "Waiting for result");
+			progress(1, "Waiting for result", !pullResult);
 			JCudaDriver.cuCtxSynchronize();
 			onResultReady.run();
 		}
@@ -353,7 +356,7 @@ public class Simulator implements AutoCloseable{
 		if(onStepComplete!=null)
 			onStepComplete.run();
 		long end = System.currentTimeMillis();
-		progress(-1, "Ready");
+		progress(-1, "Ready", !pullResult);
 		return end-start;
 	}
 	
@@ -362,7 +365,8 @@ public class Simulator implements AutoCloseable{
 	public void setProgressListener(BiConsumer<Double,String> progressListener) {
 		this.progressListener = Optional.ofNullable(progressListener);
 	}
-	private void progress(double i, String status) {
+	private void progress(double i, String status, boolean quiet) {
+		if(quiet) return;
 		System.out.printf("Simulation - %f%% - %s\n", i ,status);
 		progressListener.ifPresent(p->p.accept(i, status));
 	}

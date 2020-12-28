@@ -347,7 +347,7 @@ __global__ void copy(
 //http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
 //thanks google
 extern "C"
-__global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCover, float*** humidity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperatureIn, float*** temperatureOut) {
+__global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed, float*** cloudCover, float*** humidity, int** groundType, float** elevation, float** snowCover, float** groundMoisture, float*** temperatureIn, float*** temperatureOut) {
 	//1,360 watts per square meter
 
 	// 8% backscatter from air                  30%      27%
@@ -420,7 +420,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float*** cloudCov
 			brk = true;
 		}
 
-		temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldTime[2], appliedWatts, mass, cp);
+		temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts, mass, cp);
 
 		if(brk){
 			for(int g=alt; g>=0; g--)
