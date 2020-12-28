@@ -165,6 +165,7 @@ public class FxViewer extends Application{
 //						if(limit!=1)
 							Platform.runLater(()->{
 								timeStep.setDisable(false);
+								cancelButton.setVisible(false);
 								timeStepStatus.setText("Ready");
 								timestepProgress.setProgress(-1);
 							});

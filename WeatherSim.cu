@@ -368,7 +368,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 
 	// 46% absorbed by surface                  88.5%    52%
 	//  6% reflected by surface                 11.5%
-
+	//if(true) return;
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 	dim3 pos = getWorldCoords(i, worldSize);
@@ -443,30 +443,30 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 
 }
 extern "C"
-__global__ void infraredCooling(int* worldSize, float* worldTime, int** groundType, float **elevation, float** groundMoisture, float*** humidity, float*** tempIn, float*** tempOut) {
+__global__ void infraredCooling(int* worldSize, float* worldTime, float* worldSpeed, float*** pressure, int** groundType, float **elevation, float** groundMoisture, float*** humidity, float*** tempIn, float*** tempOut, float*** cloudCover, float** snowCover) {
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 	dim3 pos = getWorldCoords(i, worldSize);
 	if (i>=n) return;
-//	int lat = pos.x;
-//	int lon = pos.y;
-//	int alt = pos.z;
-//
-//	const float SUN_WATTS = 1360;
-//	float GROUND_IR    = SUN_WATTS * 9;
-//	float AIR_IR = pow(.6, 1/(worldSize[2]));
-//
-//	float vol = volumeAt(worldSize, lat, alt);
-//	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt]);
-//	float wattsIR = AIR_IR * SUN_WATTS;
-//	float cp = specificHeatAir(tempIn[lat][lon][alt]);
-//	if(alt==0 || altitudeOfIndex(alt, worldSize) <= elevation[lat][lon]){
-//		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
-//		wattsIR += SUN_WATTS * .09;
-//		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
-//	}
-//
-//	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldTime[2], wattsIR, mass, cp);
+	int lat = pos.x;
+	int lon = pos.y;
+	int alt = pos.z;
+
+	const float SUN_WATTS = 1360;
+	//float GROUND_IR    = SUN_WATTS * .09;
+	float AIR_IR = .60 / worldSize[2];//pow(.6, 1/(worldSize[2]));
+
+	float vol = volumeAt(worldSize, lat, alt);
+	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt], pressure[lat][lon][alt]);
+	float wattsIR = AIR_IR * SUN_WATTS;
+	float cp = specificHeatAir(tempIn[lat][lon][alt]);
+	if(alt==0 || altitudeOfIndex(alt, worldSize)*1000 <= elevation[lat][lon]){
+		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
+		wattsIR += SUN_WATTS * .09;
+		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
+	}
+
+	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldSpeed[2], -wattsIR, mass, cp);
 }
 extern "C"
 __global__ void calcWind(

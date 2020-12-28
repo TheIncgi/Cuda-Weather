@@ -174,26 +174,40 @@ public class Simulator implements AutoCloseable{
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
-								cloudCover[0].getArgPointer(),
-								humidity[0].getArgPointer(),
+								worldSpeed.getArgPointer(),
+								pressure[0].getArgPointer(),
 								groundType.getArgPointer(),
 								elevation.getArgPointer(),
-								snowCover[0].getArgPointer(),
 								groundMoisture[0].getArgPointer(),
+								humidity[0].getArgPointer(),
 								temperature[0].getArgPointer(),
-								temperature[1].getArgPointer()
+								temperature[1].getArgPointer(),
+								
+								cloudCover[0].getArgPointer(),
+								
+								
+								snowCover[0].getArgPointer()
+								
+								
 						}),
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[1].getArgPointer(),
-								cloudCover[1].getArgPointer(),
-								humidity[1].getArgPointer(),
+								worldSpeed.getArgPointer(),
+								pressure[1].getArgPointer(),
 								groundType.getArgPointer(),
 								elevation.getArgPointer(),
-								snowCover[1].getArgPointer(),
 								groundMoisture[1].getArgPointer(),
+								humidity[1].getArgPointer(),
 								temperature[1].getArgPointer(),
-								temperature[0].getArgPointer()
+								temperature[0].getArgPointer(),
+								
+								cloudCover[1].getArgPointer(),
+								
+								
+								snowCover[1].getArgPointer(),
+								
+								
 						})
 				})
 		};

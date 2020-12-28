@@ -30,7 +30,7 @@ public class FloatVisulaizationTile extends Pane {
 		// 0d h181
 		//70d h126
 		//105 h0
-		label.setText(""+(int)x);
+		label.setText(trunc(""+(int)x));
 		x = clamp(x, 0, 105);
 		if(x<50)
 			x = map(x, 0, 70, 181, 160);
@@ -45,14 +45,14 @@ public class FloatVisulaizationTile extends Pane {
 		// 0d h181
 		//70d h126
 		//105 h0
-		label.setText(""+((int)(x*100))+"%");
+		label.setText(trunc(""+((int)(x*100)))+"%");
 		x =  clamp(x, 0, 1);
 		x *= 181;
 		rect.setFill(Color.RED.deriveColor(x, 1, 1, 1));
 	}
 	
 	public void setBiomeColor(GroundType gt, float soilMoisture) {
-		label.setText(""+((int)(soilMoisture*100))+"%");
+		label.setText(trunc(""+((int)(soilMoisture*100)))+"%");
 		rect.setFill(
 				switch(gt) {
 					case DIRT->soilMoisture<.5?Color.ROSYBROWN : Color.PERU; 
@@ -106,5 +106,8 @@ public class FloatVisulaizationTile extends Pane {
 	}
 	
 	
+	private static String trunc(String s) {
+		return s.substring(0, Math.min(3, s.length()));
+	}
 	
 }
