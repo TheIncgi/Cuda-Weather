@@ -12,38 +12,46 @@ A CUDA powered weather simultation attempt with Spring.
 [4.0 Development Notes](#section-4.0)\
 [5.0 Some fun facts](#section-5.0)\
 
-## 1.0 About this project
 <div id="section-1.0"></div>
+
+## 1.0 About this project
   This project is a started out as an idea for a larger project. I wanted to create a game where
 the world could have a detailed enviroment. I had initialy tried to draw up a map of the world but found it lacking..
 I wanted a world procedurally generated world where the weather was influenced by the terrain and the biomes influenced by the weather so I
 could acheive something that felt belivable. It also gave me a good opportunity to learn more about GPU computing (in this case with CUDA).
 
-## 1.1 Some Requirments
 <div id="section-1.1"></div>
+
+## 1.1 Some Requirments
+
  - A decent amount of RAM, I'm using 16GB of ram to test with medium worlds
  - A decent **NVIDA GPU** since this uses CUDA, I've been testing with a GeForce GTX 1050 Ti. (again, medium sized world)
  - Built on CUDA release 11.1, V11.1.105 
  - Java 15 or newer (Built on Open JDK 15)
  
+ <div id="section-1.2"></div>
+ 
 ## Setup
-<div id="section-1.2"></div>
+
  - **The application is not yet finallized, steps may change**
  - Required jars are in JCuda-All-10.1.0
  - Import as **gradle** project
  - Build.bat can be used to quickly rebuild `.ptx` files if developing
  - Launch from FXViewer or SpringAPI class
 
-## 2.0 JavaFX Interface
 <div id="section-2.0"></div>
+
+## 2.0 JavaFX Interface
+
 The JavaFX interface was mainly designed to be able to visually check that things were working correctly and provide some manual controls
 over the simulation.
 At the time of writing this, rendering is currently done with a series of (JavaFX )Rectangles and labels, this method seems to use up a significant amount of memory at
 larger scales and I plan to switch to GPU rendering in a future itteration.
 
+<div id="section-2.1"></div>
 
 ### 2.1 How to use
-<div id="section-2.1"></div>
+
 1. Launch the application from the `FxViewer` class
 2. Choose world size. Hovering over a button will tell you how much memory is needed to store the world (this does not included memory used for rendering currently)
    * Known issue: Worlds bigger than medium tend to crash from `Out of Memory` errors
@@ -60,16 +68,19 @@ larger scales and I plan to switch to GPU rendering in a future itteration.
 7. The 'Regen Terrain' and 'Test' buttons are development tools.
    Regen terrain will reload the terrain generation `.ptx` and replace the current map. (atmospheric conditions are also reset)
    
+<div id="section-3.0"></div>
 
 # 3.0 Spring API
-<div id="section-3.0"></div>
+
 To use the Spring API the simulation should instead be launched from the `SpringAPI` class (app.spring.SpringAPI).
 The simulation will automaticly start and autosave every hour. Timesteps are completed in batches and are kept as close to real time as possible.
 
 **API is not yet finallized. **
 
-### 4.0 Development notes
 <div id="section-4.0"></div>
+
+### 4.0 Development notes
+
  - The world is generated based on a modified version of perlin noise. The modification allows the generated noise to wrap east and west correctly while still allowing for offsets.
  - Formulas may not be exact in many cases as I've had to cobble together decent amounts of information from many sources.
  - There are Desmos graphs for a couple of intersesting formulas:
@@ -81,9 +92,10 @@ The simulation will automaticly start and autosave every hour. Timesteps are com
  - The effect from infrared cooling still seems to be very out of balance right now. (12/31/2020)
  - Data is only loaded to the GPU on startup, after that the data is kept in the GPU and only has to be sent back to the host after a batch of time steps. This allows a sequence of steps to happen quickly.
 
+<div id="section-5.0"></div>
 
  ### 5.0 Fun Facts
-<div id="section-5.0"></div>
+
  - At 70F a cubic meter of air can carry about 18 grams of water
  - A cubic meter of dry air weighs about 1.3 kg
  - A cubic km of cloud (at 100% relitive humidity and) at 70F can weight about 18,089,600kg **however** the upper atmosphere tends to be cold (say -15/20F) and instead ends up weighing about
