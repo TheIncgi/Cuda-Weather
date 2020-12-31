@@ -5,7 +5,7 @@ A CUDA powered weather simultation attempt with Spring.
 # Status
 Currently under development. Simulation is not yet at a useable state.
 
-## Index
+# Index
 [1.0 About this project](#section-1.0)\
   [1.1 Some Requirments](#section-1.1)\
   [1.2 Setup](#section-1.2)\
@@ -17,7 +17,7 @@ Currently under development. Simulation is not yet at a useable state.
 
 <div id="section-1.0"></div>
 
-## 1.0 About this project
+# 1.0 About this project
   This project is a started out as an idea for a larger project. I wanted to create a game where
 the world could have a detailed enviroment. I had initialy tried to draw up a map of the world but found it lacking..
 I wanted a world procedurally generated world where the weather was influenced by the terrain and the biomes influenced by the weather so I
@@ -34,7 +34,7 @@ could acheive something that felt belivable. It also gave me a good opportunity 
  
  <div id="section-1.2"></div>
  
-## Setup
+## 1.2 Setup
 
  - **The application is not yet finallized, steps may change**
  - Required jars are in JCuda-All-10.1.0
@@ -44,7 +44,7 @@ could acheive something that felt belivable. It also gave me a good opportunity 
 
 <div id="section-2.0"></div>
 
-## 2.0 JavaFX Interface
+# 2.0 JavaFX Interface
 
 The JavaFX interface was mainly designed to be able to visually check that things were working correctly and provide some manual controls
 over the simulation.
@@ -53,7 +53,7 @@ larger scales and I plan to switch to GPU rendering in a future itteration.
 
 <div id="section-2.1"></div>
 
-### 2.1 How to use
+## 2.1 How to use
 
 1. Launch the application from the `FxViewer` class
 2. Choose world size. Hovering over a button will tell you how much memory is needed to store the world (this does not included memory used for rendering currently)
@@ -82,7 +82,7 @@ The simulation will automaticly start and autosave every hour. Timesteps are com
 
 <div id="section-4.0"></div>
 
-### 4.0 Development notes
+# 4.0 Development notes
 
  - The world is generated based on a modified version of perlin noise. The modification allows the generated noise to wrap east and west correctly while still allowing for offsets.
  - Formulas may not be exact in many cases as I've had to cobble together decent amounts of information from many sources.
@@ -97,7 +97,7 @@ The simulation will automaticly start and autosave every hour. Timesteps are com
 
 <div id="section-5.0"></div>
 
- ### 5.0 Fun Facts
+ # 5.0 Fun Facts
 
  - At 70F a cubic meter of air can carry about 18 grams of water
  - A cubic meter of dry air weighs about 1.3 kg
