@@ -19,7 +19,7 @@ the world could have a detailed enviroment. I had initialy tried to draw up a ma
 I wanted a world procedurally generated world where the weather was influenced by the terrain and the biomes influenced by the weather so I
 could acheive something that felt belivable. It also gave me a good opportunity to learn more about GPU computing (in this case with CUDA).
 
-## 1.1 Soem Requirments
+## 1.1 Some Requirments
 <div id="section-1.1"></div>
  - A decent amount of RAM, I'm using 16GB of ram to test with medium worlds
  - A decent **NVIDA GPU** since this uses CUDA, I've been testing with a GeForce GTX 1050 Ti. (again, medium sized world)
