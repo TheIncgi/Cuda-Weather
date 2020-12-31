@@ -2,6 +2,9 @@
 # Cuda-Weather
 A CUDA powered weather simultation attempt with Spring.
 
+# Status
+Currently under development. Simulation is not yet at a useable state.
+
 ## Index
 [1.0 About this project](#section-1.0)\
   [1.1 Some Requirments](#section-1.1)\
