@@ -2,21 +2,18 @@ package app.view;
 
 import java.util.HashMap;
 
-import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.Label;
-import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.control.TableColumn.CellDataFeatures;
-import javafx.scene.layout.GridPane;
-import javafx.util.Callback;
 
 public class DebugPanel extends TableView<DebugPanel.Row> {
 	public Row rows[];
 	private final HashMap<String, Row> lookup = new HashMap<>();
+	
+	@SuppressWarnings("unchecked")
 	public DebugPanel(String...infos) {
 		rows = new Row[infos.length];
 		for (int i = 0; i < rows.length; i++) {

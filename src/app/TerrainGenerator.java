@@ -3,13 +3,9 @@ package app;
 import static app.CudaUtils.loadModule;
 import static app.CudaUtils.loadToGPU;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
-import app.util.CudaFloat1;
 import app.util.CudaFloat2;
 import app.util.CudaInt2;
 import jcuda.Pointer;
@@ -33,13 +29,13 @@ public class TerrainGenerator {
 		CUfunction lakeFunc = CudaUtils.getFunction(module, "convertLakes");
 		
 		CUdeviceptr worldSizePtr = loadToGPU( new int[] { //constant
-				globe.latitudeDivisions, 
-				globe.longitudeDivisions, 
-				globe.altitudeDivisions
+				globe.LATITUDE_DIVISIONS, 
+				globe.LONGITUDE_DIVISIONS, 
+				globe.ALTITUDE_DIVISIONS
 		});
 		try(
-				CudaInt2   groundType= new CudaInt2(  globe.latitudeDivisions, globe.longitudeDivisions);
-				CudaFloat2 elevation = new CudaFloat2(globe.latitudeDivisions, globe.longitudeDivisions);
+				CudaInt2   groundType= new CudaInt2(  globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
+				CudaFloat2 elevation = new CudaFloat2(globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
 		){
 			
 			Pointer kernel = Pointer.to(

@@ -5,7 +5,6 @@ import java.util.function.Consumer;
 
 import app.GlobeData;
 import app.util.Triplet;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Pane;

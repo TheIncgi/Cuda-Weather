@@ -1,8 +1,5 @@
 package app.util;
 
-import java.io.Closeable;
-import java.io.IOException;
-
 import app.CudaUtils;
 import jcuda.CudaException;
 import jcuda.Pointer;

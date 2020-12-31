@@ -1,18 +1,16 @@
 package app.view;
 
+import static app.util.MathUtils.clamp;
+import static app.util.MathUtils.inRange;
+import static app.util.MathUtils.map;
+
+import app.GlobeData.GroundType;
+import app.util.MathUtils;
 import javafx.scene.control.Label;
 import javafx.scene.effect.GaussianBlur;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-
-import static app.util.MathUtils.clamp;
-import static app.util.MathUtils.map;
-
-import app.GlobeData;
-import app.GlobeData.GroundType;
-import app.util.MathUtils;
-import static app.util.MathUtils.inRange;
 public class FloatVisulaizationTile extends Pane {
 	boolean asColor = false;
 	Rectangle rect = new Rectangle();

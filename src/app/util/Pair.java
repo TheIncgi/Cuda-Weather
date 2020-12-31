@@ -15,6 +15,7 @@ public class Pair<T, U> {
 		result = prime * result + ((b == null) ? 0 : b.hashCode());
 		return result;
 	}
+	@SuppressWarnings("rawtypes")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)

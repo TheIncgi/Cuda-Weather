@@ -21,6 +21,7 @@ public class Triplet<T,U,V> {
 		result = prime * result + ((c == null) ? 0 : c.hashCode());
 		return result;
 	}
+	@SuppressWarnings("rawtypes")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)

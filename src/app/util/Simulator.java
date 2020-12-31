@@ -1,18 +1,18 @@
 package app.util;
 
+import static app.CudaUtils.getFunction;
+import static app.CudaUtils.loadModule;
+import static app.CudaUtils.loadToGPU;
+
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
-import app.CudaUtils;
 import app.GlobeData;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
 import jcuda.driver.JCudaDriver;
-
-import static app.CudaUtils.*;
 
 public class Simulator implements AutoCloseable{
 	GlobeData in;
@@ -52,7 +52,6 @@ public class Simulator implements AutoCloseable{
 		setupFuncs();
 	}
 	
-	@SuppressWarnings("unchecked")
 	private void setupFuncs() {
 		module = loadModule("WeatherSim.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
@@ -215,29 +214,29 @@ public class Simulator implements AutoCloseable{
 
 	private void initPtrs() {
 		worldSizePtr = loadToGPU( new int[] { //constant
-				in.latitudeDivisions, 
-				in.longitudeDivisions, 
-				in.altitudeDivisions
+				in.LATITUDE_DIVISIONS, 
+				in.LONGITUDE_DIVISIONS, 
+				in.ALTITUDE_DIVISIONS
 		});
 		worldSpeed = new CudaFloat1(3);
-		elevation = new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
-		groundType = new CudaInt2(in.latitudeDivisions, in.longitudeDivisions);
+		elevation = new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		groundType = new CudaInt2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
 		
 		worldTimePtr 		= new CudaFloat1[] { new CudaFloat1(2), new CudaFloat1(2) };
-		groundMoisture[0] 	= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
-		groundMoisture[1] 	= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
-		snowCover[0] 		= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
-		snowCover[1] 		= new CudaFloat2(in.latitudeDivisions, in.longitudeDivisions);
-		temperature[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		temperature[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		pressure[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		pressure[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		humidity[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		humidity[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		cloudCover[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		cloudCover[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions);
-		windSpeed[0] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions*3);
-		windSpeed[1] 		= new CudaFloat3(in.latitudeDivisions, in.longitudeDivisions, in.altitudeDivisions*3);
+		groundMoisture[0] 	= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		groundMoisture[1] 	= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		snowCover[0] 		= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		snowCover[1] 		= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		temperature[0] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		temperature[1] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		pressure[0] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		pressure[1] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		humidity[0] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		humidity[1] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		cloudCover[0] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		cloudCover[1] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS);
+		windSpeed[0] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS*3);
+		windSpeed[1] 		= new CudaFloat3(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS, in.ALTITUDE_DIVISIONS*3);
 		
 	}
 
@@ -443,6 +442,10 @@ public class Simulator implements AutoCloseable{
 			this.is3DSpace = is3DSpace;
 			this.args = argSets;
 		}
+	}
+
+	public float getTimestepSize() {
+		return timeStepSizeSeconds;
 	}
 	
 	/*

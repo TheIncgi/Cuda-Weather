@@ -1,23 +1,26 @@
 package testing;
 
 
-import jcuda.*;
-import jcuda.driver.CUcontext;
-import jcuda.driver.CUdevice;
+import static app.CudaUtils.allocateFloatArray;
+import static app.CudaUtils.getFunction;
+import static app.CudaUtils.getOutput;
+import static app.CudaUtils.loadModule;
+import static app.CudaUtils.loadToGPU;
+import static jcuda.driver.JCudaDriver.cuCtxSynchronize;
+import static jcuda.driver.JCudaDriver.cuMemFree;
+
+import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.CUfunction;
 import jcuda.driver.CUmodule;
 import jcuda.driver.JCudaDriver;
-import jcuda.runtime.*;
-import static jcuda.driver.JCudaDriver.*;
-import static app.CudaUtils.*;
 
 //nvcc -ptx JCudaVectorAddKernel.cu -o JCudaVectorAddKernel.ptx
 
 public class LetsCudaFunctionaly {
 	
-	private static CUdevice device;
-	private static CUcontext context;
+//	private static CUdevice device;
+//	private static CUcontext context;
 	
 	public static void main(String[] args) {
 //		Pointer pointer = new Pointer();
@@ -57,12 +60,12 @@ public class LetsCudaFunctionaly {
 		
 		double blocksNeeded = numElements/256d;
 		
-		int dimLimit = 65535;
+//		int dimLimit = 65535;
 		int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
 		
 		// Call the kernel function.
         int blockSizeX = 256;
-        int gridSizeX = (int)Math.ceil((double)numElements / blockSizeX);
+//        int gridSizeX = (int)Math.ceil((double)numElements / blockSizeX);
 		
         System.out.printf("Block size x: %d\nGrid size x: %d\n", blockSizeX, dim);
         

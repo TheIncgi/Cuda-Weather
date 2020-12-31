@@ -2,7 +2,6 @@ package app.view;
 
 import java.util.HashMap;
 
-import javafx.collections.ListChangeListener;
 import javafx.scene.Node;
 import javafx.scene.layout.GridPane;
 

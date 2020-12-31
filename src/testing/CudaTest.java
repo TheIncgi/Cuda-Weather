@@ -2,7 +2,7 @@ package testing;
 
 import static app.CudaUtils.getFunction;
 import static app.CudaUtils.loadModule;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 
@@ -49,6 +49,9 @@ class CudaTest {
 			assertEquals((i+1)*2, data[i]);
 		}
 		System.out.println("Passed");
+		x.close();
+		y.close();
+		z.close();
 	}
 
 }

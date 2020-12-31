@@ -1,41 +1,47 @@
 package app;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
+import java.io.Serializable;
 import java.util.Optional;
 import java.util.Random;
 
 import app.util.MathUtils;
-import app.util.Pair;
 import app.util.Vector3f;
-import jcuda.driver.CUdeviceptr;
 
-public class GlobeData {
+public class GlobeData implements Serializable {
+	/**
+	 * generated value 
+	 */
+	private static final long serialVersionUID = 4823288204349570589L;
+	
 	private boolean initalized = false;
 	/**Time is stored as {world rotation, world revolution}<br>
 	 * where {1,2} is 1 day after the second year*/
 	public final float[] time;
-	/**[Latitude][logitude][altitude]*/
+	/**[Latitude][longitude][altitude]*/
 	public final float[][][] temp, humidity, cloudCover, pressure;
-	/**[Latitude][logitude][altitude]*/
+	/**[Latitude][longitude][altitude]*/
 	public final float[][][] windSpeed;
-	/**[Latitude][logitude]*/
+	/**[Latitude][longitude]*/
 	public final float[][]    snowCover, groundMoisture, elevation;
-	/**[Latitude][logitude]*/
+	/**[Latitude][longitude]<br>
+	 * Matches the {@link GlobeData.GroundType} enum*/
 	public final int[][] groundType;
+	/**[Latitude][longitude] - only calculated for ground level*/
+	public final float[][] percipitation;
+	/**[Latitude][longitude] - only calculated for ground level<br>
+	 * matches the {@link GlobeData.PercipitationType} enum*/
+	public final int[][]   percipitationType;
 	
-	public final float worldTilt = 23.5f;
+	public final transient float worldTilt = 23.5f;
 	
-	public final int latitudeDivisions;
-	public final int longitudeDivisions;
-	public final int altitudeDivisions;
+	public final int LATITUDE_DIVISIONS;
+	public final int LONGITUDE_DIVISIONS;
+	public final int ALTITUDE_DIVISIONS;
 	
-	public static final float SIMULATION_HEIGHT_KM = 12;
-	public static final float SIMULATION_DEPTH_KM  = -.5f;
-	public static final float MAX_RAIN_CLOUD_HEIGHT_KM = 8;
-	public static final float EARTH_RADIUS_KM = 6371;
+	public static transient final float SIMULATION_HEIGHT_KM = 12;
+	public static transient final float SIMULATION_DEPTH_KM  = -.5f;
+	public static transient final float MAX_RAIN_CLOUD_HEIGHT_KM = 8;
+	public static transient final float EARTH_RADIUS_KM = 6371;
 	
 	
 	
@@ -45,9 +51,9 @@ public class GlobeData {
 	 * longitude should be 2x latitude, 180 degrees vs 360
 	 * */
 	public GlobeData(int latitudeDivisions, int longitudeDivisions, int altitudeDivisions) {
-		this.latitudeDivisions = latitudeDivisions;
-		this.longitudeDivisions = longitudeDivisions;
-		this.altitudeDivisions = altitudeDivisions;
+		this.LATITUDE_DIVISIONS = latitudeDivisions;
+		this.LONGITUDE_DIVISIONS = longitudeDivisions;
+		this.ALTITUDE_DIVISIONS = altitudeDivisions;
 		time = new float[] {0,0};
 		temp = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
 		pressure = new float[latitudeDivisions][longitudeDivisions][altitudeDivisions];
@@ -58,18 +64,20 @@ public class GlobeData {
 		groundMoisture = new float[latitudeDivisions][longitudeDivisions];
 		groundType = new int[latitudeDivisions][longitudeDivisions];
 		elevation = new float[latitudeDivisions][longitudeDivisions];
+		percipitation = new float[latitudeDivisions][longitudeDivisions];
+		percipitationType = new int[latitudeDivisions][longitudeDivisions];
 	}
 	public GlobeData(GlobeData copySize) {
-		this(copySize.latitudeDivisions, copySize.longitudeDivisions, copySize.altitudeDivisions);
+		this(copySize.LATITUDE_DIVISIONS, copySize.LONGITUDE_DIVISIONS, copySize.ALTITUDE_DIVISIONS);
 	}
 	
 	/**Return the lower bound for this altitude index*/
 	public float altitudeLowerBound(int index) {
-		return index/(float)altitudeDivisions * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
+		return index/(float)ALTITUDE_DIVISIONS * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
 	}
 	/**Return the lower bound for this altitude index*/
 	public float altitudeUpperBound(int index) {
-		return (index+1)/(float)altitudeDivisions * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
+		return (index+1)/(float)ALTITUDE_DIVISIONS * (SIMULATION_HEIGHT_KM - SIMULATION_DEPTH_KM) - SIMULATION_DEPTH_KM;
 	}
 	
 	
@@ -79,19 +87,22 @@ public class GlobeData {
 		return Optional.of(indexOfAltitudeDirect(km));
 	}
 	public int indexOfAltitudeDirect(float km) {
-		return (int) MathUtils.map(km, SIMULATION_DEPTH_KM, SIMULATION_HEIGHT_KM, 0, altitudeDivisions);
+		return (int) MathUtils.map(km, SIMULATION_DEPTH_KM, SIMULATION_HEIGHT_KM, 0, ALTITUDE_DIVISIONS);
 	}
 	
 	/**Corner of region*/
 	private Vector3f pointOf(int lat, int lon, int alt) {
-		float yaw = 360f * lon / longitudeDivisions;
-		float pitch = 180f * lat / latitudeDivisions;
+		float yaw = 360f * lon / LONGITUDE_DIVISIONS;
+		float pitch = 180f * lat / LATITUDE_DIVISIONS;
 		Vector3f p = new Vector3f(EARTH_RADIUS_KM + altitudeLowerBound(alt), 0, 0);
 		p.rotateAboutY((float) Math.toRadians(pitch));
 		p.rotateAboutZ((float) Math.toRadians(yaw));
 		return p;
 	}
-	
+	/**
+	 * Returns area in squared KM<br>
+	 * Area is identical at all longitudes
+	 * */
 	public float areaAtLowerBound(int latitude, int altitude) {
 		Vector3f a = pointOf(latitude, 0, altitude);
 		Vector3f b = pointOf(latitude, 1, altitude);
@@ -99,21 +110,39 @@ public class GlobeData {
 		Vector3f d = pointOf(latitude+1, 1, altitude);
 		return MathUtils.areaTrapazoid(a.distance(b), c.distance(d), a.distance(c)/*Aprox*/);
 	}
+	/**
+	 * Returns volume in KM cubed for a single grid with a height of 1 altitude division<br>
+	 * Volume is identical at all longitudes
+	 * */
 	public float volumeAt(int latitude, int altitude) {
 		return volumeAt(latitude, altitude, altitude+1);
 	}
+	/**
+	 * Returns volume in KM cubed<br>
+	 * Volume is identical at all longitudes
+	 * */
 	public float volumeAt(int latitude, int altitudeLow, int altHi) {
 		float a = areaAtLowerBound(latitude, altitudeLow);
 		float b = areaAtLowerBound(latitude, altHi);
 		float h = altitudeLowerBound(altHi) - altitudeLowerBound(altitudeLow);
 		return (a+b)/2 * h;
 	}
+	/**
+	 * Returns volume in KM cubed<br>
+	 * Volume is identical at all longitudes<br>
+	 * This returns the the volume for all altitude divisions summed
+	 * */
 	public float volumeAt(int latitude) {
-		return volumeAt(latitude, 0, altitudeDivisions);
+		return volumeAt(latitude, 0, ALTITUDE_DIVISIONS);
 	}
+	/**
+	 * {@link Deprecated} this calculation will be completed on the GPU for consistant results on
+	 * FX viewer and Headless simulation.
+	 * */
+	@Deprecated
 	public float percipitationChanceAt(int latitude, int longitude) {
 		int altLimit = indexOfAltitudeDirect(GlobeData.MAX_RAIN_CLOUD_HEIGHT_KM);
-		altLimit = MathUtils.clamp(altLimit, 0, altitudeDivisions);
+		altLimit = MathUtils.clamp(altLimit, 0, ALTITUDE_DIVISIONS);
 		float chance = 1;
 		for (int alti = 0; alti < altLimit; alti++) {
 			float c = cloudCover[latitude][longitude][alti]*(humidity[latitude][longitude][alti]>.99?1:0); //more than 99% humidity
@@ -130,15 +159,17 @@ public class GlobeData {
 	}
 	
 	public GlobeData random() {return random(new Random().nextLong());}
+	@Deprecated
 	public GlobeData random(long seed) {
 		Random r = new Random(seed);
-		for(int lat = 0; lat<latitudeDivisions; lat++) {
-			for(int lon = 0; lon<longitudeDivisions; lon++) {
+		for(int lat = 0; lat<LATITUDE_DIVISIONS; lat++) {
+			for(int lon = 0; lon<LONGITUDE_DIVISIONS; lon++) {
 				groundType[lat][lon] = r.nextInt(GroundType.values().length);
 				snowCover[lat][lon] = r.nextFloat()>.75? r.nextFloat()*5 : 0;
 				groundMoisture[lat][lon] = r.nextFloat();
 				elevation[lat][lon] = r.nextFloat() * 3000; //meters
-				for(int al = 0; al<altitudeDivisions; al++) {
+				
+				for(int al = 0; al<ALTITUDE_DIVISIONS; al++) {
 					temp[lat][lon][al] = r.nextFloat()*95;
 					humidity[lat][lon][al] = r.nextFloat();
 					cloudCover[lat][lon][al] = r.nextFloat()>.5? r.nextFloat() : 0;
@@ -149,6 +180,8 @@ public class GlobeData {
 					
 					
 				}
+				percipitation[lat][lon] = percipitationChanceAt(lat, lon);
+				percipitationType[lat][lon] = PercipitationType.NONE.ordinal();
 			}
 		}
 		return this;
@@ -187,13 +220,22 @@ public class GlobeData {
 		FOREST,//6
 		LAKE  //7
 	}
+	
+	public enum PercipitationType {
+		NONE,
+		RAIN,
+		THUNDER,
+		SLEET,
+		SNOW,
+		HAIL;
+	}
 
 	public long groundCells() {
-		return latitudeDivisions * (long)longitudeDivisions;
+		return LATITUDE_DIVISIONS * (long)LONGITUDE_DIVISIONS;
 	}
 
 	public long totalCells() {
-		return groundCells() * altitudeDivisions;
+		return groundCells() * ALTITUDE_DIVISIONS;
 	}
 	
 	public static long byteSizeIf(int lon, int lat, int alt) {

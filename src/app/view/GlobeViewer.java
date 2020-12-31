@@ -4,8 +4,6 @@ import app.GlobeData;
 import app.TerrainGenerator;
 import app.util.MathUtils;
 import javafx.application.Platform;
-import javafx.beans.value.ObservableValue;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -14,9 +12,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToolBar;
 import javafx.scene.effect.GaussianBlur;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 
@@ -51,8 +47,8 @@ public class GlobeViewer extends BorderPane{
 	
 	public GlobeViewer(GlobeData gd) {
 		this.globeData = gd;
-		for(int la=0; la<gd.latitudeDivisions; la++)
-			for(int lo=0; lo<gd.longitudeDivisions; lo++) {
+		for(int la=0; la<gd.LATITUDE_DIVISIONS; la++)
+			for(int lo=0; lo<gd.LONGITUDE_DIVISIONS; lo++) {
 				FloatVisulaizationTile terain = new FloatVisulaizationTile(lo, la);
 				FloatVisulaizationTile elev = new FloatVisulaizationTile(lo, la);
 				FloatVisulaizationTile temp = new FloatVisulaizationTile(lo, la);
@@ -116,7 +112,7 @@ public class GlobeViewer extends BorderPane{
 		colorOverlay.getItems().addAll("None","Elevation","Humidity", "Temperature", "Wind Speed", "Cloud Coverage-Alti","Cloud Coverage-All", "Pressure", "Percipitation");
 		numberOverlay.getSelectionModel().select(0);
 		colorOverlay.getSelectionModel().select(0);
-		altitudeSlider = new Slider(0, gd.altitudeDivisions-.5, 0);
+		altitudeSlider = new Slider(0, gd.ALTITUDE_DIVISIONS-.5, 0);
 		numberOverlay.valueProperty().addListener(e->onChangedMode());
 		colorOverlay.valueProperty().addListener(e->onChangedMode());
 		altitudeSlider.valueProperty().addListener(e->onChangedMode());
@@ -132,7 +128,7 @@ public class GlobeViewer extends BorderPane{
 			regenerate.setDisable(true);
 			Thread buildWorld = new Thread(()->{
 				System.out.println("Regenerating...");
-				GlobeData result = new GlobeData(globeData.latitudeDivisions, globeData.longitudeDivisions, globeData.altitudeDivisions);
+				GlobeData result = new GlobeData(globeData.LATITUDE_DIVISIONS, globeData.LONGITUDE_DIVISIONS, globeData.ALTITUDE_DIVISIONS);
 				TerrainGenerator tg = new TerrainGenerator();
 				tg.generate(result);
 				System.out.println("Loading regenerated terrain..");
@@ -147,9 +143,9 @@ public class GlobeViewer extends BorderPane{
 		
 		testButton.setOnAction(e->{
 			float sum = 0;
-			for (int la = 0; la < globeData.latitudeDivisions; la++) {
-				for (int lo = 0; lo < globeData.longitudeDivisions; lo++) {
-					for (int al = 0; al < globeData.altitudeDivisions; al++) {
+			for (int la = 0; la < globeData.LATITUDE_DIVISIONS; la++) {
+				for (int lo = 0; lo < globeData.LONGITUDE_DIVISIONS; lo++) {
+					for (int al = 0; al < globeData.ALTITUDE_DIVISIONS; al++) {
 						sum += globeData.windSpeed[la][lo][al*3]; //debug, holds air mass rn
 					}
 				}
@@ -175,8 +171,8 @@ public class GlobeViewer extends BorderPane{
 	public void replaceGlobeData(GlobeData gd) {
 		System.out.println("Updating map...");
 		this.globeData = gd;
-		for(int lat = 0; lat < globeData.latitudeDivisions; lat++) {
-			for(int lon = 0; lon < globeData.longitudeDivisions; lon++) {
+		for(int lat = 0; lat < globeData.LATITUDE_DIVISIONS; lat++) {
+			for(int lon = 0; lon < globeData.LONGITUDE_DIVISIONS; lon++) {
 				if(terainGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt)
 					fvt.setBiomeColor(GlobeData.GroundType.values()[gd.groundType[lat][lon]], gd.groundMoisture[lat][lon]);
 			}
@@ -192,13 +188,13 @@ public class GlobeViewer extends BorderPane{
 		debug.setText(String.format("World time: \n%8.4f\n%8.4f\n%s", globeData.time[0], globeData.time[1], globeData.getTime(0)));
 		
 		int altitude = (int) altitudeSlider.getValue();
-		float mixup = (float) (altitudeSlider.getValue() % 1);
-		for(int lat = 0; lat < globeData.latitudeDivisions; lat++) {
-			for(int lon = 0; lon < globeData.longitudeDivisions; lon++) {
+		float mixup = (float) (altitudeSlider.getValue() % 1); //TODO interpolate for nice transitions 
+		for(int lat = 0; lat < globeData.LATITUDE_DIVISIONS; lat++) {
+			for(int lon = 0; lon < globeData.LONGITUDE_DIVISIONS; lon++) {
 				if(cloudCoverGridAll.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) {
 					if(cloudCoverGridAll.isVisible()) {
 						float cu = 0;
-						for (int alti = 0; alti < globeData.altitudeDivisions; alti++) 
+						for (int alti = 0; alti < globeData.ALTITUDE_DIVISIONS; alti++) 
 							cu = Math.max(globeData.cloudCover[lat][lon][alti], cu);
 
 
@@ -298,12 +294,12 @@ public class GlobeViewer extends BorderPane{
 	private void onMouseOver(FloatVisulaizationTile fvt) {
 		int alti = (int) altitudeSlider.getValue();
 		float cu = 0;
-		for (int a = 0; a < globeData.altitudeDivisions; a++) 
+		for (int a = 0; a < globeData.ALTITUDE_DIVISIONS; a++) 
 			cu = Math.max(globeData.cloudCover[fvt.y][fvt.x][a], cu);
 		
 		debugTile.changeValue("Pos:", 			String.format("%d %d", fvt.x, fvt.y));
-		debugTile.changeValue("Latitude:", 		String.format("%7.4f°", fvt.y * -180d / globeData.latitudeDivisions +90));
-		debugTile.changeValue("Longitude:", 	String.format("%7.4f°", fvt.x * 360d / globeData.longitudeDivisions));
+		debugTile.changeValue("Latitude:", 		String.format("%7.4f°", fvt.y * -180d / globeData.LATITUDE_DIVISIONS +90));
+		debugTile.changeValue("Longitude:", 	String.format("%7.4f°", fvt.x * 360d / globeData.LONGITUDE_DIVISIONS));
 		debugTile.changeValue("Elevation:", 	String.format("%5.1fm", globeData.elevation[fvt.y][fvt.x]));
 		debugTile.changeValue("Altitude:", 		String.format("%7.4f",  globeData.altitudeLowerBound(alti)));
 		debugTile.changeValue("Ground:", 		String.format("%s", GlobeData.GroundType.values()[globeData.groundType[fvt.y][fvt.x]]));
