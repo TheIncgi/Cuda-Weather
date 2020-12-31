@@ -172,7 +172,7 @@ __device__ float airDensity(float tempF, float relHumid, float pressureAtmos){
 //https://www.engineeringtoolbox.com/maximum-moisture-content-air-d_1403.html
 /**returns the maximum grams of water held by 1 cubic meter of air at some given temp*/
 __device__ float maxWaterHeld(float temp){
-	temp = CtoF(temp);
+	temp = FtoC(temp); //TODO this had CtoF, switched to FtoC, checkme
 	float s = 486647.468932;
 	float k = 139.7;
 	float p = 44.210324391;
