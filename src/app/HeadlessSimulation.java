@@ -19,7 +19,7 @@ import jcuda.driver.JCudaDriver;
  * The simulation runs at 1x speed (real time) or as close as it can.<br>
  * The simulation will start as soon as an instance of this class is created.<br>
  * */
-public class HeadlessSimulation {
+public class HeadlessSimulation implements AutoCloseable{
 	private GlobeData data;
 	private Simulator simulator;
 	private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
@@ -50,6 +50,7 @@ public class HeadlessSimulation {
 			}
 		},  0, updatePeriod);
 		
+		CudaUtils.init();
 		lock.writeLock().lock();
 		simulator.initAtmosphere();
 		lock.writeLock().unlock();
@@ -141,5 +142,11 @@ public class HeadlessSimulation {
 	/**Stops the simulation's scheduled task*/
 	public void shutdown() {
 		timer.cancel();
+	}
+
+	@Override
+	public void close() throws Exception {
+		CudaUtils.destroyContext();
+		simulator.close();
 	}
 }

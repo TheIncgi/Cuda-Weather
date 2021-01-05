@@ -23,7 +23,7 @@ class List {
     }
   __device__ ~List() {delete values;}
   __device__ void push(T value){
-      if(_size==limit) resize(_size+16);
+      if(_size==limit) resize(_size*2);
       values[_size++] = value;
     }
   __device__ T pop(){ return values[--_size];}

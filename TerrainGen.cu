@@ -222,8 +222,8 @@ __device__ int countLakeR(int lat, int lon, int dx, int dy, int* worldSize, int 
 }
 __device__ int countLake(int lat, int lon, int* worldSize, int depth, int** groundType){
 	int m = 0;
-	List<dim2> open(depth);
-	List<dim2> closed(depth);
+	List<dim2> open(depth+4);
+	List<dim2> closed(depth+4);
 	dim2 pos = {lat, lon};
 	dim2 pos2;
 	open.push(pos);
@@ -264,7 +264,7 @@ __device__ int countLake(int lat, int lon, int* worldSize, int depth, int** grou
 extern "C"
 __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 	int i = getGlobalThreadID();
-	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	int n = worldSize[0] * worldSize[1]; //ground only ( * worldSize[2])
 
 	if (i<n) {
 		dim3 pos = getWorldCoords(i, worldSize); //x is latitude in return result
@@ -331,7 +331,7 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 extern "C"
 __global__ void convertLakes(int* worldSize, int** groundType, float** elevation){
 	int i = getGlobalThreadID();
-	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	int n = worldSize[0] * worldSize[1]; //ground only
 
 	if (i<n) {
 		int thresh = ceil(pow(ceil(worldSize[0] * 0.15),2));
@@ -343,5 +343,24 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
 			if(matches < thresh)
 				groundType[pos.x][pos.y] = LAKE;
 		}
+	}
+}
+
+/**
+ * A second attempt to create a way to detect enclosed bodies of water with minimal memory usage.
+ * */
+extern "C"
+__global__ void convertLakes2(int* worldSize, int** groundType, float** elevation, int** neighbors, int step){
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1]; //ground only
+
+	if (i<n) {
+
+		if(step < 0){ //final step, neg value indicates total steps done
+
+		}else if(step == 0){
+
+		}
+
 	}
 }

@@ -3,7 +3,6 @@ package app.spring.api;
 import static app.spring.SpringAPI.headlessSimulation;
 
 import java.util.Arrays;
-import java.util.WeakHashMap;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,9 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import app.GlobeData;
 import app.GlobeData.GroundType;
 import app.GlobeData.PercipitationType;
-import app.spring.api.states.GlobeState;
 import app.spring.api.states.GroundWeatherState;
-import app.util.Triplet;
 
 @RestController
 @RequestMapping("api")

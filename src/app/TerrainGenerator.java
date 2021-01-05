@@ -27,21 +27,35 @@ public class TerrainGenerator {
 		CUmodule module = loadModule("TerrainGen.ptx");
 		CUfunction groundFunc = CudaUtils.getFunction(module, "genTerrain");
 		CUfunction lakeFunc = CudaUtils.getFunction(module, "convertLakes");
+		CUfunction lakeFunc2 = CudaUtils.getFunction(module, "convertLakes2");
 		
 		CUdeviceptr worldSizePtr = loadToGPU( new int[] { //constant
 				globe.LATITUDE_DIVISIONS, 
 				globe.LONGITUDE_DIVISIONS, 
 				globe.ALTITUDE_DIVISIONS
 		});
+		int[] lakeStep = new int[] {0};
 		try(
 				CudaInt2   groundType= new CudaInt2(  globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
 				CudaFloat2 elevation = new CudaFloat2(globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
+				CudaInt2   neighbors = new CudaInt2(  globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
+				
 		){
 			
 			Pointer kernel = Pointer.to(
 					Pointer.to(worldSizePtr),
 					groundType.getArgPointer(),
 					elevation.getArgPointer()
+			);
+			
+			Pointer lakeStepPtr = Pointer.to(lakeStep);
+			
+			Pointer kernal2 = Pointer.to(
+					Pointer.to(worldSizePtr),
+					groundType.getArgPointer(),
+					elevation.getArgPointer(),
+					neighbors.getArgPointer(),
+					lakeStepPtr
 			);
 			
 			int blockSizeX1 = 256;
@@ -61,8 +75,13 @@ public class TerrainGenerator {
 			JCudaDriver.cuLaunchKernel(groundFunc,
 					dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();
-			JCudaDriver.cuLaunchKernel(lakeFunc,
-					dim2, dim2, dim2, blockSizeX2, 1, 1, 0, null, kernel, null);
+			
+			for(int i = 0; i<globe.LATITUDE_DIVISIONS/4; i++) {
+				lakeStep[0] = i;
+				JCudaDriver.cuMemcpyHtoD(Pointer.to, srcHost, ByteCount)
+				JCudaDriver.cuLaunchKernel(lakeFunc2,
+					dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernal2, null);
+			}
 			JCudaDriver.cuCtxSynchronize();
 			groundType.pull(globe.groundType);
 			elevation.pull(globe.elevation);
