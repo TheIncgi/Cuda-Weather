@@ -3,6 +3,7 @@ package app.spring.api;
 import static app.spring.SpringAPI.headlessSimulation;
 
 import java.util.Arrays;
+import java.util.WeakHashMap;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,13 +13,15 @@ import org.springframework.web.bind.annotation.RestController;
 import app.GlobeData;
 import app.GlobeData.GroundType;
 import app.GlobeData.PercipitationType;
+import app.spring.api.states.GlobeState;
 import app.spring.api.states.GroundWeatherState;
+import app.util.Triplet;
 
 @RestController
 @RequestMapping("api")
 public class Status {
 	
-	//TODO cache results between simulation batches to reduce read-lock time
+	
 	
 	@GetMapping("worldSize")
 	public int[] worldSize() {
@@ -48,9 +51,15 @@ public class Status {
 			@RequestParam(name = "lat", required = true                     ) int lat, 
 			@RequestParam(name = "lon", required = true                     ) int lon,
 			@RequestParam(name = "alt", required = false, defaultValue = "0") int alt) {
-		GlobeData gd = headlessSimulation().getData();
 		
 		headlessSimulation().readLock();
+		GroundWeatherState gws = weatherAt_noSync(lat, lon, alt);
+		headlessSimulation().readUnlock();
+		return gws;
+	}
+	
+	private GroundWeatherState weatherAt_noSync( int lat, int lon, int alt ) {
+		GlobeData gd = headlessSimulation().getData();
 		
 		float temperature 		= gd.temp[lat][lon][alt];
 		float humidity    		= gd.humidity[lat][lon][alt];
@@ -67,10 +76,31 @@ public class Status {
 		PercipitationType percipitationType = PercipitationType.values()[gd.percipitationType[lat][lon]]; //uses ordinal
 		GroundType groundType    			= GroundType.values()[gd.groundType[lat][lon]];
 		
-		headlessSimulation().readUnlock();
+		float globalTime = gd.time[0];
+		float year = gd.time[1];
+		
+		float localTime = globalTime + (lon / gd.LONGITUDE_DIVISIONS);
 		
 		GroundWeatherState gws = new GroundWeatherState(temperature, humidity, totalCloudCover, pressure, windSpeed, 
-				snowCover, groundMoisture, percipitationChance, percipitationType, groundType);
+				snowCover, groundMoisture, percipitationChance, percipitationType, groundType, globalTime, localTime, year);
 		return gws;
+	}
+	
+	
+	@GetMapping("weatherAll")
+	public GroundWeatherState[][] weatherAll() {
+		GlobeData gd = headlessSimulation().getData();
+		GroundWeatherState[][] out = new GroundWeatherState[gd.LATITUDE_DIVISIONS][gd.LONGITUDE_DIVISIONS];
+		headlessSimulation().readLock();
+		
+		for (int lat = 0; lat < out.length; lat++) {
+			for (int lon = 0; lon < out[0].length; lon++) {
+				out[lat][lon] = weatherAt_noSync(lat, lon, 0);
+			}
+		}
+		
+		headlessSimulation().readUnlock();
+		
+		return out;
 	}
 }

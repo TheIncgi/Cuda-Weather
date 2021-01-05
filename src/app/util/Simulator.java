@@ -287,6 +287,8 @@ public class Simulator implements AutoCloseable{
 	 * Use on newly generated worlds to add air
 	 * */
 	public void initAtmosphere() {
+		if(in.isInitalized()) return;
+		
 		int blockSizeX = 256;
 		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
 		Triplet<CUfunction, Boolean, Pointer> step = atmosphereInit;

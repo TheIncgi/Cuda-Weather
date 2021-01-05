@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import app.GlobeData;
 import app.HeadlessSimulation;
+import app.TerrainGenerator;
 
 @SpringBootApplication
 public class SpringAPI {
@@ -25,7 +26,10 @@ public class SpringAPI {
 	
 	public static void launchSpring(String[] args) {
 		headlessSimulation = new HeadlessSimulation(load(SAVE_LOCATION, ()->{ 
-			return new GlobeData(DEF_LATITUDE_DIV, DEF_LONGITUDE_DIV, DEF_ALTITUDE_DIV); 
+			GlobeData gd = new GlobeData(DEF_LATITUDE_DIV, DEF_LONGITUDE_DIV, DEF_ALTITUDE_DIV);
+			TerrainGenerator tg = new TerrainGenerator();
+			tg.generate(gd);
+			return gd;
 		}), 60_000); //by the minute updates
 		headlessSimulation.autoSave(SAVE_LOCATION, Duration.ofHours(1));
 		SpringApplication.run(SpringAPI.class, args);

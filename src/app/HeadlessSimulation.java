@@ -30,6 +30,9 @@ public class HeadlessSimulation {
 	private Timer timer;
 	private Timer saveTimer;
 	
+	/**Triggers before the write lock is released.*/
+	private Runnable onTimestepBatchComplete;
+	
 	
 	
 	public HeadlessSimulation(int latitudeDivisions, int longitudeDivisions, int altitudeDivisions, long updatePeriod) {
@@ -46,6 +49,10 @@ public class HeadlessSimulation {
 				timestep();
 			}
 		},  0, updatePeriod);
+		
+		lock.writeLock().lock();
+		simulator.initAtmosphere();
+		lock.writeLock().unlock();
 	}
 	
 	private void timestep() {
@@ -69,6 +76,10 @@ public class HeadlessSimulation {
 			simulator.timeStep( i == limit );
 		JCudaDriver.cuCtxSynchronize();
 		stepsCompleted += limit;
+		
+		if(onTimestepBatchComplete!=null)
+			onTimestepBatchComplete.run();
+		
 		lock.writeLock().unlock();
 	}
 	
@@ -120,6 +131,11 @@ public class HeadlessSimulation {
 				}
 			}
 		}, period.toMillis(), period.toMillis());
+	}
+	
+	/**Set a task to complete before the write lock is released on a timestep batch*/
+	public void setOnTimestepBatchComplete(Runnable onTimestepBatchComplete) {
+		this.onTimestepBatchComplete = onTimestepBatchComplete;
 	}
 	
 	/**Stops the simulation's scheduled task*/

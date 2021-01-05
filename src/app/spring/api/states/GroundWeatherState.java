@@ -21,22 +21,30 @@ public class GroundWeatherState {
 	PercipitationType percipitationType;
 	GroundType groundType; //can change based on climate
 	
+	/**time is at longitude 0*/
+	float globalTime;
+	float localTime;
+	float year;
+	
 	
 	//generated constructor
 	public GroundWeatherState(float temperature, float humidity, float[] cloudCover, float pressure,
 			float[] windSpeed, float snowCover, float groundMoisture, float percipitationChance, 
-			PercipitationType percipitationType, GroundType groundType) {
+			PercipitationType percipitationType, GroundType groundType, float globalTime, float localTime, float year) {
 		super();
-		this.temperature = temperature;
-		this.humidity = humidity;
-		this.cloudCover = cloudCover;
-		this.pressure = pressure;
-		this.windSpeed = windSpeed;
-		this.snowCover = snowCover;
-		this.groundMoisture = groundMoisture;
-		this.percipitationChance = percipitationChance;
-		this.percipitationType = percipitationType;
-		this.groundType = groundType;
+		this.temperature 			= temperature;
+		this.humidity 				= humidity;
+		this.cloudCover 			= cloudCover;
+		this.pressure 				= pressure;
+		this.windSpeed 				= windSpeed;
+		this.snowCover 				= snowCover;
+		this.groundMoisture 		= groundMoisture;
+		this.percipitationChance 	= percipitationChance;
+		this.percipitationType  	= percipitationType;
+		this.groundType 			= groundType;
+		this.globalTime 			= globalTime;
+		this.localTime 				= localTime;
+		this.year 					= year;
 	}
 	
 	//generated getters
@@ -69,5 +77,15 @@ public class GroundWeatherState {
 	}
 	public PercipitationType getPercipitationType() {
 		return percipitationType;
+	}
+	
+	public float getGlobalTime() {
+		return globalTime;
+	}
+	public float getLocalTime() {
+		return localTime;
+	}
+	public float getYear() {
+		return year;
 	}
 }
