@@ -286,6 +286,7 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 
 		      p*=1.5;
 		      p-=.2;
+		//https://www.desmos.com/calculator/uuvyruqbyk
 		float latitude = map(pos.x, 0, worldSize[0], 90, -90);
 		float deadZone = 12;
 		float iceyP = p* (zone(abs(latitude), 90, 6, 1.4));//(p * ( 1-zone(abs(latitude), 90, 2, 1.4)));
@@ -300,7 +301,7 @@ __global__ void genTerrain(int* worldSize, int** groundType, float** elevation){
 				gt = ICE;
 				e = map(p, 0, .6, 0,1);
 			}else {
-				gt = OCEAN; //about 71% of the earth's surface is water
+				gt = LAKE; //about 71% of the earth's surface is water
 				e = map(p, 0, .6, -.5, -.01);
 			}
 		}
@@ -350,17 +351,43 @@ __global__ void convertLakes(int* worldSize, int** groundType, float** elevation
  * A second attempt to create a way to detect enclosed bodies of water with minimal memory usage.
  * */
 extern "C"
-__global__ void convertLakes2(int* worldSize, int** groundType, float** elevation, int** neighbors, int step){
+__global__ void convertLakes2(int* worldSize, int** groundType,  int* changed){
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1]; //ground only
 
 	if (i<n) {
-
-		if(step < 0){ //final step, neg value indicates total steps done
-
-		}else if(step == 0){
-
+		dim3 pos = getWorldCoords(i, worldSize);
+		int ground = groundType[pos.x][pos.y];
+		float lat = map(pos.x, 0, worldSize[0], -90,90);
+		if(ground != LAKE) return;
+		if(lat < -80 || lat > 80) { //https://www.desmos.com/calculator/uuvyruqbyk area forced to be ocean or ice
+			if(ground != OCEAN) {
+				groundType[pos.x][pos.y] = OCEAN;
+				*changed = 1;
+			}
+		}else{
+			dim2 q = wrapCoords(pos.x+1, pos.y  , worldSize);
+			if(groundType[q.x][q.y] == OCEAN) {
+				groundType[pos.x][pos.y] = OCEAN;
+				*changed = 2;
+			}
+			q = wrapCoords(pos.x-1, pos.y  , worldSize);
+			if(groundType[q.x][q.y] == OCEAN) {
+				 groundType[pos.x][pos.y] = OCEAN;
+				*changed = 3;
+			}
+			q = wrapCoords(pos.x  , pos.y+1, worldSize);
+			if(groundType[q.x][q.y] == OCEAN) {
+				groundType[pos.x][pos.y] = OCEAN;
+				*changed = 4;
+			}
+			q = wrapCoords(pos.x  , pos.y-1, worldSize);
+			if(groundType[q.x][q.y] == OCEAN) {
+				groundType[pos.x][pos.y] = OCEAN;
+				*changed = 5;
+			}
 		}
+
 
 	}
 }

@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import app.util.CudaFloat2;
+import app.util.CudaInt0;
 import app.util.CudaInt2;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
@@ -34,12 +35,12 @@ public class TerrainGenerator {
 				globe.LONGITUDE_DIVISIONS, 
 				globe.ALTITUDE_DIVISIONS
 		});
-		int[] lakeStep = new int[] {0};
+		
 		try(
 				CudaInt2   groundType= new CudaInt2(  globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
 				CudaFloat2 elevation = new CudaFloat2(globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
 				CudaInt2   neighbors = new CudaInt2(  globe.LATITUDE_DIVISIONS, globe.LONGITUDE_DIVISIONS);
-				
+				CudaInt0   isChanged = new CudaInt0();
 		){
 			
 			Pointer kernel = Pointer.to(
@@ -48,18 +49,16 @@ public class TerrainGenerator {
 					elevation.getArgPointer()
 			);
 			
-			Pointer lakeStepPtr = Pointer.to(lakeStep);
+			
 			
 			Pointer kernal2 = Pointer.to(
 					Pointer.to(worldSizePtr),
 					groundType.getArgPointer(),
-					elevation.getArgPointer(),
-					neighbors.getArgPointer(),
-					lakeStepPtr
+					isChanged.getArgPointer()
 			);
 			
-			int blockSizeX1 = 256;
-			int blockSizeX2 = 4;
+			int blockSizeX1 = 256; //TODO fine tune, 2^n
+			int blockSizeX2 = 256;
 			long gridSizeX_groundOnly1     = (long)Math.ceil((double)(globe.groundCells()) / blockSizeX1);
 			long gridSizeX_groundOnly2     = (long)Math.ceil((double)(globe.groundCells()) / blockSizeX2);
 			double blocksNeeded1 = gridSizeX_groundOnly1;
@@ -76,12 +75,20 @@ public class TerrainGenerator {
 					dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernel, null);
 			JCudaDriver.cuCtxSynchronize();
 			
-			for(int i = 0; i<globe.LATITUDE_DIVISIONS/4; i++) {
-				lakeStep[0] = i;
-				JCudaDriver.cuMemcpyHtoD(Pointer.to, srcHost, ByteCount)
-				JCudaDriver.cuLaunchKernel(lakeFunc2,
-					dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernal2, null);
-			}
+			boolean changed = false;
+			int debug = 0;
+			do {
+				isChanged.push(0);
+				for(int i = 0; i<16; i++) {
+					
+					
+					JCudaDriver.cuLaunchKernel(lakeFunc2,
+						dim1, dim1, dim1, blockSizeX1, 1, 1, 0, null, kernal2, null);
+				}
+				JCudaDriver.cuCtxSynchronize();
+				changed = isChanged.pull() != 0;
+				System.out.println("CHANGED = "+changed+ "("+isChanged.pull()+") : " +(debug++));
+			}while(changed);
 			JCudaDriver.cuCtxSynchronize();
 			groundType.pull(globe.groundType);
 			elevation.pull(globe.elevation);
