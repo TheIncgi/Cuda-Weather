@@ -7,7 +7,9 @@ import static app.CudaUtils.loadToGPU;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
+import app.CudaUtils;
 import app.GlobeData;
+import app.view.GpuGlobeRenderView;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.CUfunction;
@@ -27,6 +29,8 @@ public class Simulator implements AutoCloseable{
 	private CUdeviceptr worldSizePtr;
 	private CudaFloat1   worldSpeed; //not changed by CUfunction
 	private CudaFloat1[] worldTimePtr = new CudaFloat1[2];
+	private CudaInt1 imageSize;
+	private CudaInt1 imageOut;
 	private CudaInt2   groundType;
 	private CudaFloat2 elevation;    //not changed
 	private CudaFloat2[] groundMoisture = new CudaFloat2[2],
@@ -40,8 +44,9 @@ public class Simulator implements AutoCloseable{
 	//private Pointer[] kernalParams = new Pointer[2];
 	private int activeKernal = 0;
 	private boolean dataLoaded = false;
-	private CUmodule module;
+	private CUmodule module, renderModule;
 	private Optional<BiConsumer<Double,String>> progressListener = Optional.empty();
+	private Step renderStep;
 	
 	public Simulator(GlobeData world) {
 		in = world;
@@ -54,6 +59,7 @@ public class Simulator implements AutoCloseable{
 	
 	private void setupFuncs() {
 		module = loadModule("WeatherSim.ptx");
+		renderModule = loadModule("worldRender.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
 		
 		atmosphereInit = new Triplet<CUfunction, Boolean, Pointer>(
@@ -208,8 +214,41 @@ public class Simulator implements AutoCloseable{
 								
 								
 						})
-				})
+				})	
 		};
+		
+		renderStep = new Step("Render", getFunction(renderModule, "render"), false, new Pointer[] {
+				Pointer.to(
+						worldSize,
+						elevation.getArgPointer(),
+						groundType.getArgPointer(),
+						worldTimePtr[0].getArgPointer(),
+						groundMoisture[0].getArgPointer(),
+						snowCover[0].getArgPointer(),
+						temperature[0].getArgPointer(),
+						pressure[0].getArgPointer(),
+						humidity[0].getArgPointer(),
+						cloudCover[0].getArgPointer(),
+						windSpeed[0].getArgPointer(),
+						imageSize.getArgPointer(),
+						imageOut.getArgPointer()
+				),Pointer.to(
+						worldSize,
+						elevation.getArgPointer(),
+						groundType.getArgPointer(),
+						worldTimePtr[1].getArgPointer(),
+						groundMoisture[1].getArgPointer(),
+						snowCover[1].getArgPointer(),
+						temperature[1].getArgPointer(),
+						pressure[1].getArgPointer(),
+						humidity[1].getArgPointer(),
+						cloudCover[1].getArgPointer(),
+						windSpeed[1].getArgPointer(),
+						imageSize.getArgPointer(),
+						imageOut.getArgPointer()
+				)
+		});
+		
 	}
 
 	private void initPtrs() {
@@ -221,6 +260,9 @@ public class Simulator implements AutoCloseable{
 		worldSpeed = new CudaFloat1(3);
 		elevation = new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
 		groundType = new CudaInt2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
+		
+		imageSize           = new CudaInt1(2);
+		imageOut            = new CudaInt1(GpuGlobeRenderView.IMAGE_HEIGHT * GpuGlobeRenderView.IMAGE_WIDTH);
 		
 		worldTimePtr 		= new CudaFloat1[] { new CudaFloat1(2), new CudaFloat1(2) };
 		groundMoisture[0] 	= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
@@ -249,6 +291,7 @@ public class Simulator implements AutoCloseable{
 										worldRevolutionRatePerStep,
 										timeStepSizeSeconds
 		});
+		imageSize					  .push(new int[] {GpuGlobeRenderView.IMAGE_WIDTH, GpuGlobeRenderView.IMAGE_HEIGHT});
 		elevation		              .push( in.elevation		);
 		groundType		              .push( in.groundType		);
 		worldTimePtr    [activeKernal].push( in.time            );
@@ -430,6 +473,7 @@ public class Simulator implements AutoCloseable{
 		windSpeed[0].close();
 		windSpeed[1].close();
 		JCudaDriver.cuModuleUnload(module);
+		JCudaDriver.cuModuleUnload(renderModule);
 	}
 	
 	private class Step {
@@ -448,6 +492,42 @@ public class Simulator implements AutoCloseable{
 
 	public float getTimestepSize() {
 		return timeStepSizeSeconds;
+	}
+	
+	public void render(int[] buffer) {
+		
+		if(CudaUtils.modifiedSinceRead("worldRender.ptx")) {
+			JCudaDriver.cuModuleUnload(renderModule);
+			renderModule = loadModule("worldRender.ptx");
+			renderStep.function = getFunction(renderModule, "render");
+			System.out.println("Render module has been automaticly reloaded.");
+		}
+		
+		int k = 1-activeKernal;
+		//renderStep.
+		
+		int blockSizeX = 256;
+		long pixelCount = (long) Math.ceil(GpuGlobeRenderView.IMAGE_WIDTH * GpuGlobeRenderView.IMAGE_HEIGHT / (float)blockSizeX);
+		Step step = renderStep;
+		CUfunction f = step.function;
+		double blocksNeeded = pixelCount;
+			
+		int dimLimit = 65535;
+		int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+		if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+		JCudaDriver.cuLaunchKernel(f,       
+			//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
+		    dim,  dim, dim,      // Grid dimension 
+		    blockSizeX, 1, 1,      // Block dimension
+		    0, null,               // Shared memory size and stream 
+		    step.args[k], null // Kernel- and extra parameters
+		); 
+		
+	
+			
+		
+		imageOut.pull(buffer);
+		JCudaDriver.cuCtxSynchronize();
 	}
 	
 	/*

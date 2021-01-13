@@ -109,7 +109,7 @@ extern "C"
 __global__ void render(
 		//static
 			int*     worldSize,
-			float*   worldSpeed,
+			//float*   worldSpeed,
 			float**  elevation,
 			int**    groundType,
 
@@ -126,6 +126,19 @@ __global__ void render(
 			float*** windSpeedIn,
 
 			int*   imageSize,
-			float* imageOut
-			)
-)
+			int* imageOut
+			) {
+	int n = getGlobalThreadID();
+	if(n > imageSize[0]*imageSize[1]) return;
+	int x = n % imageSize[0];
+	int y = n / imageSize[1];
+
+	int cx = imageSize[0]/2;
+	int cy = imageSize[1]/2;
+
+	float d = pow( (double)(cx-x)*(cx-x) + (cy-y)*(cy-y), .5 );
+	int fragColor = ((int)clamp(d/40, 0, 1) * 255) | 0xFF000000;
+
+	imageOut[n] = fragColor;
+
+}

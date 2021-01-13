@@ -7,6 +7,13 @@ import static jcuda.driver.JCudaDriver.cuMemAlloc;
 import static jcuda.driver.JCudaDriver.cuMemcpyDtoH;
 import static jcuda.driver.JCudaDriver.cuMemcpyHtoD;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.util.HashMap;
+
 import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUcontext;
@@ -58,6 +65,25 @@ public class CudaUtils {
 		CUmodule module = new CUmodule();
 		JCudaDriver.cuModuleLoad(module, file);
 		return module;
+	}
+	
+	private static HashMap<String, FileTime> lastMod = new HashMap<>();
+	public static boolean modifiedSinceRead(String module) {
+		try {
+			File file = new File(module);
+			BasicFileAttributes x= Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+			FileTime t = x.lastModifiedTime();
+			boolean out = false;
+			if(lastMod.containsKey(module)) {
+				FileTime b = lastMod.get(module);
+				out = b.compareTo(t) != 0;
+			}
+			lastMod.put(module, t);
+			return out;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 	
 	public static CUfunction getFunction(CUmodule module, String fName) {

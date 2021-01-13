@@ -2,6 +2,7 @@ package app;
 
 import app.util.Simulator;
 import app.view.GlobeViewer;
+import app.view.GpuGlobeRenderView;
 import app.view.LoadingPane;
 import app.view.WorldSizePicker;
 import javafx.application.Application;
@@ -13,6 +14,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToolBar;
 import javafx.scene.image.Image;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
 public class FxViewer extends Application{
@@ -58,10 +60,12 @@ public class FxViewer extends Application{
 				CudaUtils.destroyContext();
 				Platform.runLater(()->{
 					lp.status("Building display...", 1);
-					GlobeViewer gv = new GlobeViewer(result);
-					launchSimThread(result, gv);
-					scene.setRoot(gv);
-					gv.setBottom(simulationControls);
+					//GlobeViewer gv = new GlobeViewer(result);
+					GpuGlobeRenderView gpuRenderer = new GpuGlobeRenderView();
+					launchSimThread(result, gpuRenderer);
+					gpuRenderer.setBottom(simulationControls);
+					scene.setRoot(gpuRenderer);
+					
 				});
 				
 			}, "World Construction");
@@ -104,7 +108,7 @@ public class FxViewer extends Application{
 		
 	}
 	
-	private void launchSimThread(final GlobeData world, final GlobeViewer gv) {
+	private void launchSimThread(final GlobeData world, final GpuGlobeRenderView gv) {
 		bgThread = new Thread(()->{
 			
 			
@@ -114,6 +118,7 @@ public class FxViewer extends Application{
 			CudaUtils.init();
 			System.out.println("Creating simulation space");
 			simulator = new Simulator(world);
+			gv.setSimulator(simulator);
 			System.out.println("  adding simulation listeners");
 			simulator.setProgressListener((prog, status)->{
 				if(stepCount.getValue()==1)
@@ -126,7 +131,7 @@ public class FxViewer extends Application{
 			
 			simulator.setOnResultReady(()->{
 				Platform.runLater(()->{
-					gv.updateOverlays();
+					gv.update();
 				});
 			});
 			
@@ -134,6 +139,9 @@ public class FxViewer extends Application{
 			Platform.runLater(()->{
 				timeStep.setDisable(false);
 				timeStepStatus.setText("Ready");
+			});
+			Platform.runLater(()->{
+				gv.update();
 			});
 			while(running) {
 				try {
