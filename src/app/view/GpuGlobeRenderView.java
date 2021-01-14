@@ -26,10 +26,8 @@ public class GpuGlobeRenderView extends BorderPane{
 		setTop(top);
 		rerender.setOnAction( e->update() );
 		img = new WritableImage(IMAGE_WIDTH, IMAGE_HEIGHT);
-		Pane wrapper = new Pane(imageView);
 		imageView.setPreserveRatio(true);
-		imageView.fitWidthProperty().bind(wrapper.widthProperty());
-		wrapper.setPrefWidth(200);
+		
 		setCenter(new ScrollPane(imageView));
 		
 		imageView.setImage(img);

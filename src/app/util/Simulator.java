@@ -496,11 +496,19 @@ public class Simulator implements AutoCloseable{
 	
 	public void render(int[] buffer) {
 		
+		
 		if(CudaUtils.modifiedSinceRead("worldRender.ptx")) {
 			JCudaDriver.cuModuleUnload(renderModule);
 			renderModule = loadModule("worldRender.ptx");
 			renderStep.function = getFunction(renderModule, "render");
 			System.out.println("Render module has been automaticly reloaded.");
+			dataLoaded = false;
+		}
+		if(!dataLoaded) {
+			progress(0, "Pushing data", false);
+			pushData();
+			JCudaDriver.cuCtxSynchronize();
+			dataLoaded = true;
 		}
 		
 		int k = 1-activeKernal;
