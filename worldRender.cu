@@ -28,11 +28,11 @@ struct vec3{
 	float x, y,z;
 };
 struct vec4{
-	/**R*/
+	/**R/H*/
 	float x;
-	/**G*/
+	/**G/S*/
 	float y;
-	/**B*/
+	/**B/V*/
 	float z;
 	/**A*/
 	float w;
@@ -119,6 +119,22 @@ __device__ float distance(float a, float b, float x, float y){
 __device__ float zone(float x, float target, float width, float sharpness){
 	return 1 / ( 1 + pow(abs(target/width - x/width), sharpness) );
 }
+
+//you've got a pocket full of it?
+/*Calculates the brightness of sunshine in an area on a scale of 0 to 1*/
+__device__ float sunshine(float lat, float lon, int* worldSize, float* worldTime){
+	vec3 sun = {1, 0, 0};
+	float yaw = (float) (-360.0 * (lon ) / worldSize[1]);
+	float pitch = (float) (180.0 * (lat ) / worldSize[0] -90.0);
+	yaw += worldTime[0] * -360; //daily rotation
+	yaw += worldTime[1] * -360; //if the earth didn't rotate, it'd have 1 day every year
+	vec3 p = {1, 0, 0};
+	rotateVec3AboutY(p, pitch * HALF_C);
+	rotVec3AboutZ(p, yaw * HALF_C);
+	rotateVec3AboutY(p, PLANET_TILT * HALF_C * sin( worldTime[1]*360 * HALF_C ));
+
+	return clamp(dot(sun,p), 0, 1); //praise the sun
+}
 ///////////// Perlin ///////////////// //TODO make this into a sep file, share with Terrain gen
 
 __device__ float interpolate(float x, float y,float f){
@@ -196,7 +212,7 @@ __device__ float perlin(double x, double y, bool wrapTop, bool wrapX1, bool wrap
     return value;
 }
 
-__device__ float perlin(int x, int y, double scale, float offsetX, float offsetY, int* worldSize){
+__device__ float perlin(float x, float y, double scale, float offsetX, float offsetY, int* worldSize){
 	double dx = (x + offsetX*scale)/scale;//(x /*+  f1/(scale*2)*/   +offsetX)/scale;
 	double dy = (y + offsetY*scale)/scale;//(y /*+  f2/(scale*2)*/   +offsetY)/scale;
 	bool wrapTop = ((int)(x / scale)) == 0;
@@ -275,10 +291,10 @@ __device__ int argbToHex(vec4 in){
 }
 __device__ vec4 hexToRgb(int hex){
 	vec4 out;
-	out.w = ( hex >> 24 ) & 0xFF;
-	out.x = ( hex >> 16 ) & 0xFF;
-	out.y = ( hex >>  8 ) & 0xFF;
-	out.z = ( hex       ) & 0xFF;
+	out.w = (( hex >> 24 ) & 0xFF) / (float)255;
+	out.x = (( hex >> 16 ) & 0xFF) / (float)255;
+	out.y = (( hex >>  8 ) & 0xFF) / (float)255;
+	out.z = (( hex       ) & 0xFF) / (float)255;
 	return out;
 }
 __device__ int mixColors(int a, int b, float bAmount) {
@@ -293,10 +309,25 @@ __device__ int mixColors(int a, int b, float bAmount) {
 	t.w = sqrt( ((i.w * i.w) * aAmount) + ((j.w * j.w) * bAmount));
 	return argbToHex(t);
 }
+__device__ vec4 sunshineColorArgb( float lat, float lon, int* worldSize, int* worldTime ) {
+	float s = sunshine(lat, lon, worldSize, worldTime);
+	vec4 in;
+	in.x = 35;//h
+	in.y = 1-s; //s
+	in.z = s; //v
+	in.w = 1; //a
+	return hsvToArgb(in);
+}
 // |~~~~~~~~~~~~~~~~~~~~~
 // |     Render code
 // |~~~~~~~~~~~~~~~~~~~~~
 
+__device__ float distanceToEdge(int a, int b, float af, float bf){
+	float da = af - a;
+	float db = bf - b;
+	float thresh = .6;
+	return min(1.0, max( 0.0, max( abs(thresh-da), abs(thresh-db) ) ));
+}
 __device__ int colorAt(int lat, int lon, int** groundType, float** groundMoistureIn){
 	int fragColor = 0xFF000000;
 	int gType = groundType[lat][lon];
@@ -355,24 +386,36 @@ __device__ void renderFlat(
 
 //		int cx = imageSize[0]/2;
 //		int cy = imageSize[1]/2;
-		int lat = y * (worldSize[0]) / (imageSize[1]);
-		int lon = x * worldSize[1] / imageSize[0];
-		float latf = y * (float)worldSize[0] / imageSize[1] + .5;
-		float lonf = x * (float)worldSize[1] / imageSize[0] + .5;
+		int lat    = y *         worldSize[0]  / imageSize[1];
+		int lon    = x *         worldSize[1]  / imageSize[0];
+		float latf = y * ((float)worldSize[0]) / imageSize[1] + .5;
+		float lonf = x * ((float)worldSize[1]) / imageSize[0] + .5;
 
-		float offX = perlin(latf, lonf, .5, 999, 45, worldSize);
-		float offY = perlin(latf, lonf, .5, 27, 98, worldSize);
+		float tileWidth  = imageSize[0] / (float)worldSize[1];
+		float tileHeight = imageSize[1] / (float)worldSize[0];
+
+		float offX = perlin(latf, lonf, .25, 999, 45, worldSize);
+		float offY = perlin(latf, lonf, .25, 27, 98, worldSize);
 
 		int theColor = colorAt(lat, lon, groundType, groundMoistureIn);
 		int blendColor = colorAt(
-				(lat + sign(offX)) % worldSize[0],
-				(lon + sign(offY)) % worldSize[1],
+				((int)(latf + offX)) % worldSize[0],
+				((int)(lonf + offY)) % worldSize[1],
 				groundType,
 				groundMoistureIn
 		);
+		offX = perlin(latf, lonf, .1, 7798, 45, worldSize);
+		offY = perlin(latf, lonf, .1, 991, 98, worldSize);
 
+		blendColor = mixColors(blendColor, colorAt(
+				((int)(latf + offX)) % worldSize[0],
+				((int)(lonf + offY)) % worldSize[1],
+				groundType,
+				groundMoistureIn), .5);
+
+		int PERL = ((int)( (offX+1)*127 )) + 0xFF000000 ;
 		//FIXME awesome blending
-		imageOut[i] = theColor;//mixColors(theColor, blendColor, distance((float)lat, (float)lon, latf, lonf));
+		imageOut[i] = theColor;//mixColors(theColor, blendColor, .5*distanceToEdge(lat, lon, latf, lonf));
 //		if(lat == 47)
 //			fragColor = 0xFFFF00FF;
 //		fragColor = 0xFF000000 | ((int)(lat/((float)worldSize[0])*255));
