@@ -25,7 +25,7 @@ public class TerrainGenerator {
 	
 	public void generate(GlobeData globe) {
 		tell("Loading Terrain Generator...",.1f);
-		CUmodule module = loadModule("TerrainGen.ptx");
+		CUmodule module = loadModule("cuda/ptx/TerrainGen.ptx");
 		CUfunction groundFunc = CudaUtils.getFunction(module, "genTerrain");
 		CUfunction lakeFunc = CudaUtils.getFunction(module, "convertLakes");
 		CUfunction lakeFunc2 = CudaUtils.getFunction(module, "convertLakes2");

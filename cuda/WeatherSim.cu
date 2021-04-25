@@ -4,28 +4,9 @@
 #define __shared__
 #endif
 #include "math.h"
-
-float __constant__ PI     = 3.14159654;
-float __constant__ E      = 2.71828182846;
-float __constant__ HALF_C = 3.14159654/180;
-float __constant__ sqrt2  = 1.41421356237;
-float __constant__ sqrt3  = 1.73205080757;
-float __constant__ PLANET_RADIUS = 6371; //km
-float __constant__ PLANET_MASS   = 5.972e24; //kg ...that's 5 septillion
-float __constant__ PLANET_TILT   = 23.5;
-float __constant__ GRAVITATIONAL_CONSTANT = 6.67E-11;
-int __constant__ SAND     = 0;
-int __constant__ DIRT     = 1;
-int __constant__ OCEAN    = 2;
-int __constant__ GRASS    = 3; //promoted from dirt in low rain, dry climates
-int __constant__ STONE    = 4;
-int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
-int __constant__ FOREST   = 6; //promoted from dirt, humid climates
-int __constant__ LAKE     = 7; //local minima of rainy areas
-
-struct vec3{
-	float x, y,z;
-};
+#include "constants.cu"
+#include "common.cu"
+#include "vectors.cu"
 
 //Notes about functions:
 //temperature is in fahrenheit
@@ -34,36 +15,9 @@ struct vec3{
 //wind speed is used to calculate momentum
 
 
-//cuda related
-__device__ int getThreadsPerBlock(){
-	return blockDim.x * blockDim.y * blockDim.z;
-}
-__device__ int getBlockID(){
-	return    blockIdx.x +
-			  blockIdx.y * gridDim.x +
-			  blockIdx.z * gridDim.x * gridDim.y;
-}
-__device__ int getLocalThreadID() {
-	return threadIdx.x +
-		   threadIdx.y * blockDim.x +
-		   threadIdx.z * blockDim.x * blockDim.y;
-}
-__device__ int getGlobalThreadID(){
-	return getLocalThreadID() + getBlockID() * getThreadsPerBlock();
-}
+
 
 //math
-__device__ float map(float x, float inMin, float inMax, float outMin, float outMax) {
-	return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-}
-__device__ float clamp(float x, float low, float high){
-	if(high < low){
-		int t = low;
-		low = high;
-		high = t;
-	}
-	return x < low? low : (x > high ? high : x);
-}
 
 __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	int latitude =  gThreadID % worldSize[0];
@@ -74,34 +28,7 @@ __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	return dim3(latitude, longitude, altitude);
 }
 
-__device__ dim3 wrapCoords(int x, int y, int* worldSize){
-	int la = x;
-	int lo = y % worldSize[1];
-	if(la < 0){
-		lo = (lo + worldSize[1] / 2) % worldSize[1];
-		la = -la -1;
-	}else if(la >= worldSize[0]){
-		lo = (lo + worldSize[1] / 2) % worldSize[1];
-		la = worldSize[0]-(la-worldSize[0]+1);
-	}
-	la = (la + worldSize[0]) % worldSize[0];
-	lo = (lo + worldSize[1]) % worldSize[1];
-	dim3 out(la, lo, 0);
-	return out;
-}
 
-__device__ void rotVec3AboutZ(vec3 &vec, float yaw){
-	double nx = vec.x*cos(yaw) - vec.y*sin(yaw);
-	double ny = vec.x*sin(yaw) + vec.y*cos(yaw);
-	vec.x = (float) nx;
-	vec.y = (float) ny;
-}
-__device__ void rotateVec3AboutY(vec3 &vec, float pitch) {
-	double nx = vec.x*cos(pitch) + vec.z*sin(pitch);
-	double nz = -vec.x*sin(pitch) + vec.z*cos(pitch);
-	vec.x = (float) nx;
-	vec.z = (float) nz;
-}
 
 /**altitude in KM*/
 __device__ float altitudeOfIndex(int index, int* worldSize){
@@ -113,9 +40,7 @@ __device__ float distance(vec3 a, vec3 b){
 	float dz = b.z-a.z;
 	return sqrt( dx*dx + dy*dy + dz*dz );
 }
-__device__ float dot(vec3 a, vec3 b){
-	return a.x*b.x + a.y*b.y + a.z*b.z;
-}
+
 //polar to cartesian
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude, bool center){
 	float yaw = (float) (360.0 * (longitude + 0.5) / worldSize[1]);

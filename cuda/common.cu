@@ -1,49 +1,13 @@
+#pragma once
 #ifdef __CDT_PARSER__
 #define __global__
 #define __device__
 #define __shared__
 #endif
-
-//TODO make this a shared header
-
-float __constant__ PI     = 3.14159654;
-float __constant__ E      = 2.71828182846;
-float __constant__ HALF_C = 3.14159654/180;
-float __constant__ sqrt2  = 1.41421356237;
-float __constant__ sqrt3  = 1.73205080757;
-
-int __constant__ SAND     = 0;
-int __constant__ DIRT     = 1;
-int __constant__ OCEAN    = 2;
-int __constant__ GRASS    = 3; //promoted from dirt in low rain, dry climates
-int __constant__ STONE    = 4;
-int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
-int __constant__ FOREST   = 6; //promoted from dirt, humid climates
-int __constant__ LAKE     = 7; //local minima of rainy areas
-
-struct vec2{
-	float x, y;
-};
-struct vec3{
-	float x, y,z;
-};
-struct vec4{
-	/**R/H*/
-	float x;
-	/**G/S*/
-	float y;
-	/**B/V*/
-	float z;
-	/**A*/
-	float w;
-};
-struct dim2{
-	int x,y;
-};
-__device__ bool operator==(const dim2& lhs, const dim2& rhs)
-{
-    return lhs.x == rhs.x && lhs.y == rhs.y;
-}
+#include "cuda.h"
+#include "vectors.cu"
+#include "math.h"
+#include "constants.cu"
 
 //cuda related
 __device__ int getThreadsPerBlock(){
@@ -62,7 +26,6 @@ __device__ int getLocalThreadID() {
 __device__ int getGlobalThreadID(){
 	return getLocalThreadID() + getBlockID() * getThreadsPerBlock();
 }
-
 
 __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	int latitude =  gThreadID % worldSize[0];
@@ -120,6 +83,19 @@ __device__ float zone(float x, float target, float width, float sharpness){
 	return 1 / ( 1 + pow(abs(target/width - x/width), sharpness) );
 }
 
+__device__ void rotVec3AboutZ(vec3 &vec, float yaw){
+	double nx = vec.x*cos(yaw) - vec.y*sin(yaw);
+	double ny = vec.x*sin(yaw) + vec.y*cos(yaw);
+	vec.x = (float) nx;
+	vec.y = (float) ny;
+}
+__device__ void rotateVec3AboutY(vec3 &vec, float pitch) {
+	double nx = vec.x*cos(pitch) + vec.z*sin(pitch);
+	double nz = -vec.x*sin(pitch) + vec.z*cos(pitch);
+	vec.x = (float) nx;
+	vec.z = (float) nz;
+}
+
 //you've got a pocket full of it?
 /*Calculates the brightness of sunshine in an area on a scale of 0 to 1*/
 __device__ float sunshine(float lat, float lon, int* worldSize, float* worldTime){
@@ -136,6 +112,10 @@ __device__ float sunshine(float lat, float lon, int* worldSize, float* worldTime
 	return clamp(dot(sun,p), 0, 1); //praise the sun
 }
 ///////////// Perlin ///////////////// //TODO make this into a sep file, share with Terrain gen
+
+
+
+
 
 __device__ float interpolate(float x, float y,float f){
 	return clamp( x * (1-f) + y * f,   x, y);

@@ -58,8 +58,8 @@ public class Simulator implements AutoCloseable{
 	}
 	
 	private void setupFuncs() {
-		module = loadModule("WeatherSim.ptx");
-		renderModule = loadModule("worldRender.ptx");
+		module = loadModule("cuda/ptx/WeatherSim.ptx");
+		renderModule = loadModule("cuda/ptx/worldRender.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
 		
 		atmosphereInit = new Triplet<CUfunction, Boolean, Pointer>(
@@ -497,9 +497,9 @@ public class Simulator implements AutoCloseable{
 	public void render(int[] buffer) {
 		
 		
-		if(CudaUtils.modifiedSinceRead("worldRender.ptx")) {
+		if(CudaUtils.modifiedSinceRead("cuda/ptx/worldRender.ptx")) {
 			JCudaDriver.cuModuleUnload(renderModule);
-			renderModule = loadModule("worldRender.ptx");
+			renderModule = loadModule("cuda/ptx/worldRender.ptx");
 			renderStep.function = getFunction(renderModule, "render");
 			System.out.println("Render module has been automaticly reloaded.");
 			dataLoaded = false;
