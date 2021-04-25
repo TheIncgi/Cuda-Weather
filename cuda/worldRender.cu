@@ -11,7 +11,7 @@ __device__ vec4 sunshineColorArgb( float lat, float lon, int* worldSize, float* 
 	float s = sunshine(lat, lon, worldSize, worldTime);
 	vec4 in;
 	in.x = 35;//h
-	in.y = 1-s*s; //s
+	in.y = clamp(1-s,0,1); //s
 	in.z = max(s, .3); //v
 	in.w = 1; //a
 	return hsvToArgb(in);
