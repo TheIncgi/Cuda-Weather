@@ -7,6 +7,14 @@
 #include "vectors.cu"
 #include "perlin.cu"
 
+//[x bits - map mode][2 bits - effects/layers]
+int __constant__ LIGHT_EFFECT=1;
+int __constant__ CLOUD_OVERLAY=2;
+int __constant__ THERMAL_OVERLAY=4;
+//wind, humidity, snow, pressure, rain, ground moisture, precipitation type
+int __constant__ ELEVATION=8;
+
+
 __device__ vec4 sunshineColorArgb( float lat, float lon, int* worldSize, float* worldTime ) {
 	float s = sunshine(lat, lon, worldSize, worldTime);
 	vec4 in;
@@ -160,5 +168,4 @@ __global__ void render(
 	if(i>= imageSize[0]*imageSize[1]) return;
 
 	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut);
-
 }

@@ -15,31 +15,11 @@
 //wind speed is used to calculate momentum
 
 
-
-
-//math
-
-__device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
-	int latitude =  gThreadID % worldSize[0];
-	gThreadID = gThreadID / worldSize[0];
-	int longitude = gThreadID % worldSize[1];
-	gThreadID = gThreadID / worldSize[1];
-	int altitude  = gThreadID % worldSize[2];
-	return dim3(latitude, longitude, altitude);
-}
-
-
-
 /**altitude in KM*/
 __device__ float altitudeOfIndex(int index, int* worldSize){
 	return map(index, 0, worldSize[2], -.5, 12);
 }
-__device__ float distance(vec3 a, vec3 b){
-	float dx = b.x-a.x;
-	float dy = b.y-a.y;
-	float dz = b.z-a.z;
-	return sqrt( dx*dx + dy*dy + dz*dz );
-}
+
 
 //polar to cartesian
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude, bool center){
@@ -435,7 +415,7 @@ __global__ void calcWind(
 
 					int la = pos.x+dlat;
 					int lo = pos.y+dlon;
-					dim3 wrapped = wrapCoords(la, lo, worldSize);
+					dim2 wrapped = wrapCoords(la, lo, worldSize);
 					la = wrapped.x;
 					lo = wrapped.y;
 

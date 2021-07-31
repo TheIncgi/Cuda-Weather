@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import app.GlobeData;
 import app.GlobeData.GroundType;
-import app.GlobeData.PercipitationType;
+import app.GlobeData.PrecipitationType;
 import app.spring.api.states.GroundWeatherState;
 
 @RestController
@@ -69,8 +69,8 @@ public class Status {
 		};
 		float snowCover						= gd.snowCover[lat][lon];     //values under 2 indicate % coverage (out of 2), this value is also the depth in cm
 		float groundMoisture    			= gd.groundMoisture[lat][lon];//values over 1 indicate flooding
-		float percipitationChance 			= gd.percipitation[lat][lon];
-		PercipitationType percipitationType = PercipitationType.values()[gd.percipitationType[lat][lon]]; //uses ordinal
+		float precipitationChance 			= gd.percipitation[lat][lon];
+		PrecipitationType precipitationType = PrecipitationType.values()[gd.precipitationType[lat][lon]]; //uses ordinal
 		GroundType groundType    			= GroundType.values()[gd.groundType[lat][lon]];
 		
 		float globalTime = gd.time[0];
@@ -79,7 +79,7 @@ public class Status {
 		float localTime = globalTime + (lon / gd.LONGITUDE_DIVISIONS);
 		
 		GroundWeatherState gws = new GroundWeatherState(temperature, humidity, totalCloudCover, pressure, windSpeed, 
-				snowCover, groundMoisture, percipitationChance, percipitationType, groundType, globalTime, localTime, year);
+				snowCover, groundMoisture, precipitationChance, precipitationType, groundType, globalTime, localTime, year);
 		return gws;
 	}
 	

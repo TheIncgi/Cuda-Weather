@@ -28,6 +28,10 @@
 .const .align 4 .u32 ICE = 5;
 .const .align 4 .u32 FOREST = 6;
 .const .align 4 .u32 LAKE = 7;
+.const .align 4 .u32 LIGHT_EFFECT = 1;
+.const .align 4 .u32 CLOUD_OVERLAY = 2;
+.const .align 4 .u32 THERMAL_OVERLAY = 4;
+.const .align 4 .u32 ELEVATION = 8;
 .global .align 4 .b8 __cudart_i2opi_f[24] = {65, 144, 67, 60, 153, 149, 98, 219, 192, 221, 52, 245, 209, 87, 39, 252, 41, 21, 68, 78, 110, 131, 249, 162};
 
 .visible .entry render(

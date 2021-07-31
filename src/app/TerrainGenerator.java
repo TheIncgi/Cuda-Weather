@@ -27,7 +27,6 @@ public class TerrainGenerator {
 		tell("Loading Terrain Generator...",.1f);
 		CUmodule module = loadModule("cuda/ptx/TerrainGen.ptx");
 		CUfunction groundFunc = CudaUtils.getFunction(module, "genTerrain");
-		CUfunction lakeFunc = CudaUtils.getFunction(module, "convertLakes");
 		CUfunction lakeFunc2 = CudaUtils.getFunction(module, "convertLakes2");
 		
 		CUdeviceptr worldSizePtr = loadToGPU( new int[] { //constant

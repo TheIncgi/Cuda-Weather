@@ -1,7 +1,7 @@
 package app.spring.api.states;
 
 import app.GlobeData.GroundType;
-import app.GlobeData.PercipitationType;
+import app.GlobeData.PrecipitationType;
 
 /**
  * This class is used to store the weather state at a single point in the world (for use with Spring API)
@@ -18,7 +18,7 @@ public class GroundWeatherState {
 	float snowCover;
 	float groundMoisture;
 	float percipitationChance;
-	PercipitationType percipitationType;
+	PrecipitationType percipitationType;
 	GroundType groundType; //can change based on climate
 	
 	/**time is at longitude 0*/
@@ -30,7 +30,7 @@ public class GroundWeatherState {
 	//generated constructor
 	public GroundWeatherState(float temperature, float humidity, float[] cloudCover, float pressure,
 			float[] windSpeed, float snowCover, float groundMoisture, float percipitationChance, 
-			PercipitationType percipitationType, GroundType groundType, float globalTime, float localTime, float year) {
+			PrecipitationType percipitationType, GroundType groundType, float globalTime, float localTime, float year) {
 		super();
 		this.temperature 			= temperature;
 		this.humidity 				= humidity;
@@ -75,7 +75,7 @@ public class GroundWeatherState {
 	public float getPercipitationChance() {
 		return percipitationChance;
 	}
-	public PercipitationType getPercipitationType() {
+	public PrecipitationType getPercipitationType() {
 		return percipitationType;
 	}
 	

@@ -29,8 +29,8 @@ public class GlobeData implements Serializable {
 	/**[Latitude][longitude] - only calculated for ground level*/
 	public final float[][] percipitation;
 	/**[Latitude][longitude] - only calculated for ground level<br>
-	 * matches the {@link GlobeData.PercipitationType} enum*/
-	public final int[][]   percipitationType;
+	 * matches the {@link GlobeData.PrecipitationType} enum*/
+	public final int[][]   precipitationType;
 	
 	public final transient float worldTilt = 23.5f;
 	
@@ -65,7 +65,7 @@ public class GlobeData implements Serializable {
 		groundType = new int[latitudeDivisions][longitudeDivisions];
 		elevation = new float[latitudeDivisions][longitudeDivisions];
 		percipitation = new float[latitudeDivisions][longitudeDivisions];
-		percipitationType = new int[latitudeDivisions][longitudeDivisions];
+		precipitationType = new int[latitudeDivisions][longitudeDivisions];
 	}
 	public GlobeData(GlobeData copySize) {
 		this(copySize.LATITUDE_DIVISIONS, copySize.LONGITUDE_DIVISIONS, copySize.ALTITUDE_DIVISIONS);
@@ -140,7 +140,7 @@ public class GlobeData implements Serializable {
 	 * FX viewer and Headless simulation.
 	 * */
 	@Deprecated
-	public float percipitationChanceAt(int latitude, int longitude) {
+	public float precipitationChanceAt(int latitude, int longitude) {
 		int altLimit = indexOfAltitudeDirect(GlobeData.MAX_RAIN_CLOUD_HEIGHT_KM);
 		altLimit = MathUtils.clamp(altLimit, 0, ALTITUDE_DIVISIONS);
 		float chance = 1;
@@ -180,8 +180,8 @@ public class GlobeData implements Serializable {
 					
 					
 				}
-				percipitation[lat][lon] = percipitationChanceAt(lat, lon);
-				percipitationType[lat][lon] = PercipitationType.NONE.ordinal();
+				percipitation[lat][lon] = precipitationChanceAt(lat, lon);
+				precipitationType[lat][lon] = PrecipitationType.NONE.ordinal();
 			}
 		}
 		return this;
@@ -221,7 +221,7 @@ public class GlobeData implements Serializable {
 		LAKE  //7
 	}
 	
-	public enum PercipitationType {
+	public enum PrecipitationType {
 		NONE,
 		RAIN,
 		THUNDER,

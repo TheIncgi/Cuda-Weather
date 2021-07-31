@@ -14,6 +14,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 
+import jcuda.CudaException;
 import jcuda.Pointer;
 import jcuda.Sizeof;
 import jcuda.driver.CUcontext;
@@ -87,9 +88,14 @@ public class CudaUtils {
 	}
 	
 	public static CUfunction getFunction(CUmodule module, String fName) {
-		CUfunction func = new CUfunction();
-		JCudaDriver.cuModuleGetFunction(func, module, fName);
-		return func;
+		try {
+			CUfunction func = new CUfunction();
+			JCudaDriver.cuModuleGetFunction(func, module, fName);
+			return func;
+		}catch(CudaException ce) {
+			System.err.printf("CudaException getting function '%s'", fName);
+			throw ce;
+		}
 	}
 	
 	public static CUdeviceptr loadToGPU(float[] data) {

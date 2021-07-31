@@ -216,7 +216,7 @@ public class GlobeViewer extends BorderPane{
 				}
 				if(rainGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(rainGrid.isVisible()) {
-						fvt.setPercentColor(globeData.percipitationChanceAt(lat, lon));
+						fvt.setPercentColor(globeData.precipitationChanceAt(lat, lon));
 					}
 				if(snowGrid.getNode(lon, lat) instanceof FloatVisulaizationTile fvt) 
 					if(snowGrid.isVisible()) {
@@ -309,7 +309,7 @@ public class GlobeViewer extends BorderPane{
 		debugTile.changeValue("Cloud:", 		String.format("%3.0f%%",   globeData.cloudCover[fvt.y][fvt.x][alti] * 100));
 		debugTile.changeValue("Cloud Cover:", 	String.format("%3.0f%%",   cu * 100)); //not accounting for angle of sun
 		debugTile.changeValue("Wind:", 			String.format("%5.2f\n%5.2f\n%5.2f",   globeData.windSpeed[fvt.y][fvt.x][alti*3],globeData.windSpeed[fvt.y][fvt.x][alti*3+1],globeData.windSpeed[fvt.y][fvt.x][alti*3+2]));
-		debugTile.changeValue("Rain:", 			String.format("%3.0f%%S", globeData.percipitationChanceAt(fvt.y, fvt.x) * 100));
+		debugTile.changeValue("Rain:", 			String.format("%3.0f%%S", globeData.precipitationChanceAt(fvt.y, fvt.x) * 100));
 		debugTile.changeValue("Pressure:", 		String.format("%4.3f",   globeData.pressure[fvt.y][fvt.x][alti]));
 	}
 }
