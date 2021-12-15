@@ -24,3 +24,6 @@ gameData.dat
 *.class
 *.class
 *.class
+*.ptx
+/.gradle/
+/bin/

@@ -6,6 +6,7 @@
 #include "common.cu"
 #include "vectors.cu"
 #include "perlin.cu"
+#include "colorBlend.cu"
 
 //[x bits - map mode][2 bits - effects/layers]
 int __constant__ LIGHT_EFFECT=1;
@@ -24,6 +25,22 @@ __device__ vec4 sunshineColorArgb( float lat, float lon, int* worldSize, float* 
 	in.w = 1; //a
 	return hsvToArgb(in);
 };
+
+__device__ vec4 thermalColor( float degreesF, float opacity ) {
+	//hue 66% deep blue
+	//50% bright blue
+	//33% green
+	//15% yellow
+	// 0%  red
+	degreesF = clamp(degreesF, -40, 110);
+	degreesF = 1 / (.0001 * (degreesF - 190)) + 110;
+	vec4 in;
+	in.x = degreesF;
+	in.y = 1;
+	in.z = 1;
+	in.w = opacity;
+	return hsvToArgb(in);
+}
 // |~~~~~~~~~~~~~~~~~~~~~
 // |     Render code
 // |~~~~~~~~~~~~~~~~~~~~~
@@ -64,6 +81,18 @@ __device__ int colorAt(int lat, int lon, int** groundType, float** groundMoistur
 //star background
 __device__ int  backgroundColor(int n, int*imgSize){
 	return 0;
+}
+__device__ void applyThermalOverlay(
+	int  i,
+	int lat, int lon,
+	int* worldSize,
+	float*** temperatureIn,
+	int*   imageSize,
+	int* imageOut,
+	int elevation
+	) {
+	vec4 color = thermalColor(temperatureIn[lat][lon][elevation], .6f);
+	imageOut[i] = argbToHex( mixColors( hexToArgb(imageOut[i]), color ) );
 }
 __device__ void renderFlat(
 		int i,
@@ -122,7 +151,7 @@ __device__ void renderFlat(
 		int PERL = ((int)( (offX+1)*127 )) + 0xFF000000 ;
 
 		vec4 sunColor = sunshineColorArgb(latf, lonf, worldSize, worldTimeIn);
-		theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
+		//theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
 		imageOut[i] = theColor;//mixColors(theColor, blendColor, .5*distanceToEdge(lat, lon, latf, lonf));
 //		if(lat == 47)
 //			fragColor = 0xFFFF00FF;
@@ -134,7 +163,14 @@ __device__ void renderFlat(
 //		if(lat >= worldSize[0])
 //			fragColor = 0xFFFF0000;
 
-
+//		applyThermalOverlay( i,
+//			lat, lon,
+//			worldSize,
+//			temperatureIn,
+//			imageSize,
+//			imageOut,
+//			0 //min elevation
+//			);
 
 
 
