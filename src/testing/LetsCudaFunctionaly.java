@@ -31,7 +31,7 @@ public class LetsCudaFunctionaly {
 		// Enable exceptions and omit all subsequent error checks
         
 		
-		CUmodule module = loadModule("JCudaVectorAddKernal.ptx");
+		CUmodule module = loadModule("cuda/ptx/JCudaVectorAddKernal.ptx");
 		CUfunction func = getFunction(module, "add");
 		
 		int numElements = 1<<27;

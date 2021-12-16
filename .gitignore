@@ -27,3 +27,4 @@ gameData.dat
 *.ptx
 /.gradle/
 /bin/
+/target/

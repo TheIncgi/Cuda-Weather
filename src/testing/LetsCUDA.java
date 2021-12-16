@@ -38,7 +38,7 @@ public class LetsCUDA {
         cuCtxCreate(context, 0, device);
 		
 		CUmodule module = new CUmodule();
-		JCudaDriver.cuModuleLoad(module, "JCudaVectorAddKernal.ptx");
+		JCudaDriver.cuModuleLoad(module, "cuda/ptx/JCudaVectorAddKernal.ptx");
 		CUfunction func = new CUfunction();
 		JCudaDriver.cuModuleGetFunction(func, module, "add");
 		
