@@ -63,6 +63,7 @@ public class CudaUtils {
 	}
 	
 	public static CUmodule loadModule(String file) {
+		System.out.println("Load module: "+file);
 		CUmodule module = new CUmodule();
 		JCudaDriver.cuModuleLoad(module, file);
 		return module;

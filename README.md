@@ -29,8 +29,8 @@ could acheive something that felt belivable. It also gave me a good opportunity 
 
  - A decent amount of RAM, I'm using 16GB of ram to test with medium worlds
  - A decent **NVIDA GPU** since this uses CUDA, I've been testing with a GeForce GTX 1050 Ti. (again, medium sized world)
- - Built on CUDA release 11.1, V11.1.105 
- - Java 15 or newer (Built on Open JDK 15)
+ - Built on [CUDA V11.1.105](https://developer.nvidia.com/cuda-11.1.1-download-archive)
+ - Java 17 or newer (Built on Open JDK 17)
  
  <div id="section-1.2"></div>
  
