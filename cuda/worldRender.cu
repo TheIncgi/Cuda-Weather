@@ -7,20 +7,29 @@
 #include "vectors.cu"
 #include "perlin.cu"
 #include "colorBlend.cu"
+#include<stdint.h>
+#include<string>
+#include "font.cu"
 
 //[x bits - map mode][2 bits - effects/layers]
-int __constant__ LIGHT_EFFECT=1;
-int __constant__ CLOUD_OVERLAY=2;
-int __constant__ THERMAL_OVERLAY=4;
+int __constant__          LIGHT_EFFECT =   1;
+int __constant__         CLOUD_OVERLAY =   2;
+int __constant__          SNOW_OVERLAY =   4;
+int __constant__       THERMAL_OVERLAY =   8;
+int __constant__      HUMIDITY_OVERLAY =  16;
+int __constant__          WIND_OVERLAY =  32;
+int __constant__    SNOW_COVER_OVERLAY =  64;
+int __constant__ PERCIPITATION_OVERLAY = 128;
+int __constant__     ELEVATION_OVERLAY = 256;
 //wind, humidity, snow, pressure, rain, ground moisture, precipitation type
-int __constant__ ELEVATION=8;
+
 
 
 __device__ vec4 sunshineColorArgb( float lat, float lon, int* worldSize, float* worldTime ) {
 	float s = sunshine(lat, lon, worldSize, worldTime);
 	vec4 in;
-	in.x = 35;//h
-	in.y = clamp(1-s,0,1); //s
+	in.x = 240;//h
+	in.y = clamp(1-s,0,.5); //s
 	in.z = max(s, .3); //v
 	in.w = 1; //a
 	return hsvToArgb(in);
@@ -114,7 +123,9 @@ __device__ void renderFlat(
 		float*** windSpeedIn,
 
 		int*   imageSize,
-		int* imageOut){
+		int* imageOut,
+		int overlayFlags,
+		FontData &fontData){
 
 		int x = i % imageSize[0];
 		int y = i / imageSize[0];
@@ -151,7 +162,27 @@ __device__ void renderFlat(
 		int PERL = ((int)( (offX+1)*127 )) + 0xFF000000 ;
 
 		vec4 sunColor = sunshineColorArgb(latf, lonf, worldSize, worldTimeIn);
-		//theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
+
+		if(overlayFlags > 8) //sunshine
+			theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
+
+		const char* str = "It's a good day if we render some text :D";
+		if(getFontStringPixel(fontData, str, x-1,y-1) >= 0)
+			theColor = 0xFFFFFFFF;
+		if(getFontStringPixel(fontData, str, x+1,y+1) >= 0)
+			theColor = 0xFFFFFFFF;
+		if(getFontStringPixel(fontData, str, x+1,y-1) >= 0)
+			theColor = 0xFFFFFFFF;
+		if(getFontStringPixel(fontData, str, x-1,y+1) >= 0)
+			theColor = 0xFFFFFFFF;
+		if(getFontStringPixel(fontData, str, x,y) >= 0)
+			theColor = 0xFF000000;
+
+		char str2[100];
+		intToStr( overlayFlags, str2, 16 );
+		if(getFontStringPixel(fontData, str2, x,y-32) >= 0)
+			theColor = 0xFFFF0000;
+
 		imageOut[i] = theColor;//mixColors(theColor, blendColor, .5*distanceToEdge(lat, lon, latf, lonf));
 //		if(lat == 47)
 //			fragColor = 0xFFFF00FF;
@@ -198,10 +229,15 @@ __global__ void render(
 			float*** windSpeedIn,
 
 			int*   imageSize,
-			int* imageOut
+			int* imageOut,
+			int overlayFlags,
+			uint8_t* font
 			) {
 	int i = getGlobalThreadID();
 	if(i>= imageSize[0]*imageSize[1]) return;
 
-	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut);
+	FontData fontData;
+	loadFont(font, fontData);
+
+	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut, overlayFlags, fontData);
 }

@@ -124,3 +124,10 @@ __device__ float smoothstep(float a0, float a1, float w){
     float value = w*w*w*(w*(w*6 - 15) + 10);
     return a0 + value*(a1 - a0);
 }
+
+/////////////////////////////////////////////
+//bit flag util
+
+__device__ bool hasFlag(int value, int test){
+	return value & test > 0;
+}

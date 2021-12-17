@@ -139,6 +139,11 @@ public class CudaUtils {
         cuMemAlloc(out, len * Sizeof.INT);
         return out;
 	}
+	public static CUdeviceptr allocateByteArray(int len) {
+		CUdeviceptr out = new CUdeviceptr();
+        cuMemAlloc(out, len * Sizeof.BYTE);
+        return out;
+	}
 	
 	public static void getOutput(CUdeviceptr ptr, float[] out) {
         cuMemcpyDtoH(Pointer.to(out), ptr,

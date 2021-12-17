@@ -4,6 +4,8 @@ import static app.CudaUtils.getFunction;
 import static app.CudaUtils.loadModule;
 import static app.CudaUtils.loadToGPU;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
@@ -31,6 +33,8 @@ public class Simulator implements AutoCloseable{
 	private CudaFloat1[] worldTimePtr = new CudaFloat1[2];
 	private CudaInt1 imageSize;
 	private CudaInt1 imageOut;
+	private CudaByte1 rawFontData;
+	private CudaInt0 overlayFlags;
 	private CudaInt2   groundType;
 	private CudaFloat2 elevation;    //not changed
 	private CudaFloat2[] groundMoisture = new CudaFloat2[2],
@@ -231,7 +235,9 @@ public class Simulator implements AutoCloseable{
 						cloudCover[0].getArgPointer(),
 						windSpeed[0].getArgPointer(),
 						imageSize.getArgPointer(),
-						imageOut.getArgPointer()
+						imageOut.getArgPointer(),
+						overlayFlags.getArgPointer(),
+						rawFontData.getArgPointer()
 				),Pointer.to(
 						worldSize,
 						elevation.getArgPointer(),
@@ -245,13 +251,24 @@ public class Simulator implements AutoCloseable{
 						cloudCover[1].getArgPointer(),
 						windSpeed[1].getArgPointer(),
 						imageSize.getArgPointer(),
-						imageOut.getArgPointer()
+						imageOut.getArgPointer(),
+						overlayFlags.getArgPointer(),
+						rawFontData.getArgPointer()
 				)
 		});
 		
 	}
 
 	private void initPtrs() {
+		byte[] fd;
+		try {
+			FileInputStream fis = new FileInputStream("epilogue.cuFont");
+			fd = fis.readAllBytes();
+			fis.close();
+		}catch(IOException ioe){
+			ioe.printStackTrace();
+			fd=new byte[8 + (127-32+4)*4]; 
+		}
 		worldSizePtr = loadToGPU( new int[] { //constant
 				in.LATITUDE_DIVISIONS, 
 				in.LONGITUDE_DIVISIONS, 
@@ -263,6 +280,9 @@ public class Simulator implements AutoCloseable{
 		
 		imageSize           = new CudaInt1(2);
 		imageOut            = new CudaInt1(GpuGlobeRenderView.IMAGE_HEIGHT * GpuGlobeRenderView.IMAGE_WIDTH);
+		overlayFlags        = new CudaInt0();
+		rawFontData			= new CudaByte1(fd.length);
+		rawFontData.push(fd);
 		
 		worldTimePtr 		= new CudaFloat1[] { new CudaFloat1(2), new CudaFloat1(2) };
 		groundMoisture[0] 	= new CudaFloat2(in.LATITUDE_DIVISIONS, in.LONGITUDE_DIVISIONS);
@@ -324,6 +344,10 @@ public class Simulator implements AutoCloseable{
 				worldRotationRatePerStep, 
 				worldRevolutionRatePerStep
 		});
+	}
+	
+	public synchronized void setOverlayFlags( int flags ) {
+		overlayFlags.push(flags);
 	}
 	
 	/**

@@ -37,9 +37,9 @@ could acheive something that felt belivable. It also gave me a good opportunity 
 ## 1.2 Setup
 
  - **The application is not yet finallized, steps may change**
- - Required jars are in JCuda-All-10.1.0
- - Import as **gradle** project
- - Build.bat can be used to quickly rebuild `.ptx` files if developing
+ - ~~Required jars are in JCuda-All-10.1.0~~
+ - Import as ~~gradle~~ **maven** project
+ - Build.bat can be used to quickly rebuild `.ptx` files if developing (located in cuda folder)
  - Launch from FXViewer or SpringAPI class
 
 <div id="section-2.0"></div>

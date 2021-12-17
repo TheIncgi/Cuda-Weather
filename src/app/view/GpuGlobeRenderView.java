@@ -2,6 +2,7 @@ package app.view;
 
 import app.CudaUtils;
 import app.util.Simulator;
+import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -25,10 +26,11 @@ public class GpuGlobeRenderView extends BorderPane{
 	Button rerender = new Button("Re-render");
 	ComboBox<Overlay> overlayPicker = new ComboBox<>();
 	CheckBox renderSnow = new CheckBox("Snow"),
-			 renderClouds = new CheckBox("Clouds");
+			 renderClouds = new CheckBox("Clouds"),
+			 renderSunshine = new CheckBox("Sunshine");
 	Slider zoom = new Slider(.5, 10, 1);
 	Slider elevation = new Slider(0, 1, 0);
-	ToolBar top = new ToolBar(rerender, overlayPicker, renderClouds, renderSnow, zoom, elevation);
+	ToolBar top = new ToolBar(rerender, overlayPicker, renderClouds, renderSnow, renderSunshine, zoom, elevation);
 	/**Uses pointers from simulator to avoid copying data*/
 	public GpuGlobeRenderView() {
 		setTop(top);
@@ -36,7 +38,7 @@ public class GpuGlobeRenderView extends BorderPane{
 		overlayPicker.getItems().addAll(Overlay.values());
 		overlayPicker.getSelectionModel().select(Overlay.NONE);
 		
-		//TODO overlay controls
+		addControlEvents();
 		
 		rerender.setOnAction( e->update() );
 		img = new WritableImage(IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -49,6 +51,17 @@ public class GpuGlobeRenderView extends BorderPane{
 	}
 	
 
+	private void addControlEvents() {
+		overlayPicker.setOnAction(this::updateFlags);
+		renderSnow.setOnAction(this::updateFlags);
+		renderClouds.setOnAction(this::updateFlags);
+		renderSunshine.setOnAction(this::updateFlags);
+	}
+	
+	private void updateFlags(ActionEvent e) {
+		simulator.setOverlayFlags( getRenderFlags() );
+	}
+
 	public void setSimulator(Simulator simulator) {
 		this.simulator = simulator;
 	}
@@ -58,6 +71,19 @@ public class GpuGlobeRenderView extends BorderPane{
 		simulator.render(buffer);
 		img.getPixelWriter().setPixels(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT, 
 				PixelFormat.getIntArgbInstance(), buffer, 0, IMAGE_WIDTH);	
+	}
+	
+	public int getRenderFlags() {
+		int flags = 0;
+		flags |= renderSunshine.isSelected()? 1 : 0;
+		flags |=   renderClouds.isSelected()? 2 : 0;
+		flags |=     renderSnow.isSelected()? 4 : 0;
+		
+		var overlay = overlayPicker.getSelectionModel().getSelectedItem();
+		if(!overlay.equals(Overlay.NONE))
+			flags |= overlay.ordinal() << 3;
+		
+		return flags;
 	}
 	
 	public enum Overlay {
