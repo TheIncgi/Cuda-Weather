@@ -129,6 +129,8 @@ __device__ void renderFlat(
 
 		int x = i % imageSize[0];
 		int y = i / imageSize[0];
+		char strBuf[100];
+		char strBuf2[100];
 
 //		int cx = imageSize[0]/2;
 //		int cy = imageSize[1]/2;
@@ -162,9 +164,35 @@ __device__ void renderFlat(
 		int PERL = ((int)( (offX+1)*127 )) + 0xFF000000 ;
 
 		vec4 sunColor = sunshineColorArgb(latf, lonf, worldSize, worldTimeIn);
+		
+		if(hasFlag(overlayFlags, THERMAL_OVERLAY)){
+			vec4 v4c  = hexToArgb(theColor);
+			vec4 thrm = thermalColor( temperatureIn[lat][lon][0], .6 );
+			v4c = mixColors( v4c, thrm );
 
-		if(overlayFlags > 8) //sunshine
+			int snapLat = ((int)(lat/5))*5;
+			int snapLon = ((int)(lon/5))*5;
+			dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
+			float tblock = temperatureIn[snapped.x][snapped.y][0];
+			int groupX = x - snapLon * tileWidth;
+			int groupY = y - snapLat * tileHeight;
+			floatToStr( tblock, strBuf, 2 );
+			// strBuf[0] = 'G';
+			// strBuf[1] = '\0';
+			if(getFontStringPixel(fontData, strBuf, groupX, groupY) >= 0)
+				v4c = mixColors( v4c,  hexToArgb(0x88000000) );
+			theColor = argbToHex(v4c);
+		}else if(hasFlag(overlayFlags, HUMIDITY_OVERLAY)) {
+
+		}
+
+		if(hasFlag(overlayFlags, LIGHT_EFFECT)) //sunshine
 			theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
+		else{
+			float f = sunshine(latf, lonf, worldSize, worldTimeIn);
+			if(0.2 <= f && f <=.225)
+				theColor = argbToHex(mixColors( hexToArgb(theColor),hexToArgb(0x88FF0000)));
+		}
 
 		const char* str = "It's a good day if we render some text :D";
 		if(getFontStringPixel(fontData, str, x-1,y-1) >= 0)
@@ -178,10 +206,26 @@ __device__ void renderFlat(
 		if(getFontStringPixel(fontData, str, x,y) >= 0)
 			theColor = 0xFF000000;
 
-		char str2[100];
-		intToStr( overlayFlags, str2, 16 );
-		if(getFontStringPixel(fontData, str2, x,y-32) >= 0)
+		
+		
+		intToStr( overlayFlags , strBuf, 16 );
+		const char* label = "Flags: ";
+		concat( label, strBuf, strBuf2, 100);
+		if(getFontStringPixel(fontData, strBuf2, x,y-32) >= 0)
 			theColor = 0xFFFF0000;
+
+		label = "Rev: ";
+		floatToStr( worldTimeIn[1], strBuf, 2 ); //rev
+		concat( label, strBuf, strBuf2, 100);
+		if(getFontStringPixel(fontData, strBuf2, x,y-64) >= 0)
+			theColor = 0xFFFF0000;
+
+		label = "Rot: ";
+		floatToStr( worldTimeIn[0], strBuf, 2 ); //rot
+		concat( label, strBuf, strBuf2, 100);
+		if(getFontStringPixel(fontData, strBuf2, x,y-96) >= 0)
+			theColor = 0xFFFF0000;
+
 
 		imageOut[i] = theColor;//mixColors(theColor, blendColor, .5*distanceToEdge(lat, lon, latf, lonf));
 //		if(lat == 47)
@@ -230,7 +274,7 @@ __global__ void render(
 
 			int*   imageSize,
 			int* imageOut,
-			int overlayFlags,
+			int* overlayFlags,
 			uint8_t* font
 			) {
 	int i = getGlobalThreadID();
@@ -239,5 +283,5 @@ __global__ void render(
 	FontData fontData;
 	loadFont(font, fontData);
 
-	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut, overlayFlags, fontData);
+	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut, *overlayFlags, fontData);
 }

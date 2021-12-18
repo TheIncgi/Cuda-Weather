@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import app.CudaUtils;
 import app.GlobeData;
 import app.view.GpuGlobeRenderView;
+import jcuda.CudaException;
 import jcuda.Pointer;
 import jcuda.driver.CUdeviceptr;
 import jcuda.driver.CUfunction;
@@ -25,7 +26,6 @@ public class Simulator implements AutoCloseable{
 	float timeStepSizeSeconds          = 5;
 	float worldRotationRatePerStep     = timeStepSizeSeconds / (24*60*60) ;
 	float worldRevolutionRatePerStep   = timeStepSizeSeconds / (24*60*60*365);
-	private Triplet<CUfunction, Boolean, Pointer> atmosphereInit;
 	private Step[] funcs;
 	//constant
 	private CUdeviceptr worldSizePtr;
@@ -50,7 +50,8 @@ public class Simulator implements AutoCloseable{
 	private boolean dataLoaded = false;
 	private CUmodule module, renderModule;
 	private Optional<BiConsumer<Double,String>> progressListener = Optional.empty();
-	private Step renderStep;
+//	private Triplet<CUfunction, Boolean, Pointer> atmosphereInit;
+	private Step renderStep, copyOver, atmosphereInit;
 	
 	public Simulator(GlobeData world) {
 		in = world;
@@ -66,17 +67,22 @@ public class Simulator implements AutoCloseable{
 		renderModule = loadModule("cuda/ptx/worldRender.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
 		
-		atmosphereInit = new Triplet<CUfunction, Boolean, Pointer>(
+		var atmoArgs = Pointer.to(
+				worldSize,
+				pressure[0].getArgPointer(),
+				temperature[0].getArgPointer()
+				);
+		atmosphereInit = new Step(
+				"Init Atmosphere",
 				getFunction(module, "initAtmosphere"),
 				true,
-				Pointer.to(
-						worldSize,
-						pressure[0].getArgPointer(),
-						temperature[0].getArgPointer()
-						)
+				new Pointer[] {atmoArgs, atmoArgs}
 		);
+		
+		
+		
 		funcs = new Step[] {
-				new Step("Copy",getFunction(module, "copy"), true, new Pointer[] {
+				copyOver = new Step("Copy",getFunction(module, "copy"), true, new Pointer[] {
 						Pointer.to(
 							worldSize,
 							worldSpeed       .getArgPointer(),
@@ -149,7 +155,9 @@ public class Simulator implements AutoCloseable{
 							worldTimePtr[0].getArgPointer(),
 							windSpeed   [0].getArgPointer()
 					})
-				}),new Step("Solar Heating",getFunction(module, "solarHeating"), false, new Pointer[] {
+				}),
+				copyBack3Step("Wind", windSpeed, worldSize),
+				new Step("Solar Heating",getFunction(module, "solarHeating"), false, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -178,8 +186,9 @@ public class Simulator implements AutoCloseable{
 								temperature[1].getArgPointer(),
 								temperature[0].getArgPointer()
 						})
-				})
-				,new Step("Infared Cooling",getFunction(module, "infraredCooling"), true, new Pointer[] {
+				}),
+				copyBackStep("Temp", temperature, worldSize),
+				new Step("Infared Cooling",getFunction(module, "infraredCooling"), true, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -350,30 +359,35 @@ public class Simulator implements AutoCloseable{
 		overlayFlags.push(flags);
 	}
 	
+	public void initAtmosphere(boolean force) {
+		if(!force && in.isInitalized()) return;
+		
+		int blockSizeX = 256;
+		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
+		
+		Step[] steps = new Step[] {atmosphereInit, copyOver};
+		for(Step step:steps) {
+			CUfunction f = step.function;
+			double blocksNeeded = gridSizeX_withAtmosphere;
+			
+			int dimLimit = 65535;
+			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+			if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+			JCudaDriver.cuLaunchKernel(f,       
+				//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
+			    dim,  dim, dim,      // Grid dimension 
+			    blockSizeX, 1, 1,      // Block dimension
+			    0, null,               // Shared memory size and stream 
+			    step.args[0], null // Kernel- and extra parameters
+			); 
+		}
+		JCudaDriver.cuCtxSynchronize();
+	}
 	/**
 	 * Use on newly generated worlds to add air
 	 * */
 	public void initAtmosphere() {
-		if(in.isInitalized()) return;
-		
-		int blockSizeX = 256;
-		long gridSizeX_withAtmosphere = (long)Math.ceil((double)(in.totalCells()) / blockSizeX);
-		Triplet<CUfunction, Boolean, Pointer> step = atmosphereInit;
-		CUfunction f = step.a;
-		double blocksNeeded = gridSizeX_withAtmosphere;
-		
-		int dimLimit = 65535;
-		int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
-		if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
-		JCudaDriver.cuLaunchKernel(f,       
-			//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
-		    dim,  dim, dim,      // Grid dimension 
-		    blockSizeX, 1, 1,      // Block dimension
-		    0, null,               // Shared memory size and stream 
-		    step.c, null // Kernel- and extra parameters
-		); 
-		
-		JCudaDriver.cuCtxSynchronize();
+		initAtmosphere(false);
 	}
 	
 	/**Begins calculation of next timestep<br>
@@ -409,23 +423,27 @@ public class Simulator implements AutoCloseable{
 		long gridSizeX_groundOnly     = (long)Math.ceil((double)(in.groundCells()) / blockSizeX);
 		for(int i = 0; i<funcs.length; i++) {
 			Step step = funcs[i];
-			progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName, !pullResult);
-			CUfunction f = step.function;
-			double blocksNeeded = step.is3DSpace? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
-			
-			int dimLimit = 65535;
-			int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
-			if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
-			JCudaDriver.cuLaunchKernel(f,       
-				//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
-			    dim,  dim, dim,      // Grid dimension 
-			    blockSizeX, 1, 1,      // Block dimension
-			    0, null,               // Shared memory size and stream 
-			    step.args[activeKernal], null // Kernel- and extra parameters
-			); 
-			
-			JCudaDriver.cuCtxSynchronize();
-			
+			try {
+				progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName, !pullResult);
+				CUfunction f = step.function;
+				double blocksNeeded = step.is3DSpace? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
+				
+				int dimLimit = 65535;
+				int dim = (int) Math.ceil(Math.pow(blocksNeeded, 1/3d));
+				if(dim > dimLimit) throw new RuntimeException("Too many blocks required for simulation ("+dim+"^3 vs limit 65535^3)");
+				JCudaDriver.cuLaunchKernel(f,       
+					//CUDA architecture limits the numbers of threads per block (1024 threads per block limit).
+				    dim,  dim, dim,      // Grid dimension 
+				    blockSizeX, 1, 1,      // Block dimension
+				    0, null,               // Shared memory size and stream 
+				    step.args[activeKernal], null // Kernel- and extra parameters
+				); 
+				
+				JCudaDriver.cuCtxSynchronize();
+			}catch(CudaException ce) {
+				System.err.println("Cuda exception on step: "+step.stepName);
+				throw ce;
+			}
 		}
 		if(pullResult) {
 			JCudaDriver.cuCtxSynchronize();
@@ -637,4 +655,51 @@ public class Simulator implements AutoCloseable{
 		paramsA[i]   = Pointer.to(windSpeed[1].getThePointer());
 		paramsB[i++] = Pointer.to(windSpeed[0].getThePointer());
 	*/
+	
+	
+	private Step copyBackStep(String varName, CudaFloat2[] buf, Pointer worldSize) {
+		return new Step("Copy back "+varName, getFunction(module, "copyBack2f"), false, new Pointer[] {
+				Pointer.to(
+						worldSize,
+						buf[0].getArgPointer(),
+						buf[1].getArgPointer()
+				),
+				Pointer.to(
+						worldSize,
+						buf[1].getArgPointer(),
+						buf[0].getArgPointer()
+				)
+		});
+	}
+	private Step copyBackStep(String varName, CudaFloat3[] buf, Pointer worldSize) {
+		return new Step("Copy back "+varName, getFunction(module, "copyBack3f"), false, new Pointer[] {
+				Pointer.to(
+						worldSize,
+						buf[0].getArgPointer(),
+						buf[1].getArgPointer()
+				),
+				Pointer.to(
+						worldSize,
+						buf[1].getArgPointer(),
+						buf[0].getArgPointer()
+				)
+		});
+	}
+	
+	//for wind
+	private Step copyBack3Step(String varName, CudaFloat3[] buf, Pointer worldSize) {
+		return new Step("Copy back "+varName, getFunction(module, "copyBack3f3"), false, new Pointer[] {
+				Pointer.to(
+						worldSize,
+						buf[0].getArgPointer(),
+						buf[1].getArgPointer()
+						),
+				Pointer.to(
+						worldSize,
+						buf[1].getArgPointer(),
+						buf[0].getArgPointer()
+						)
+		});
+	}
+	
 }

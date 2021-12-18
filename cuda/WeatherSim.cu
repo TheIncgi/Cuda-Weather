@@ -257,6 +257,37 @@ __global__ void copy(
     }
 }
 
+extern "C"
+__global__ void copyBack2f(int* worldSize, float** bufIn, float** bufOut) {
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	dim3 pos = getWorldCoords(i, worldSize);
+    if (i<n && pos.z==0) {
+    	bufIn[pos.x][pos.y] = bufOut[pos.x][pos.y];
+    }
+}
+
+extern "C"
+__global__ void copyBack3f(int* worldSize, float*** bufIn, float*** bufOut) {
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	dim3 pos = getWorldCoords(i, worldSize);
+    if (i<n) {
+		bufIn[pos.x][pos.y][pos.z] = bufOut[pos.x][pos.y][pos.z];
+    }
+}
+extern "C"
+__global__ void copyBack3f3(int* worldSize, float*** bufIn, float*** bufOut) {
+	int i = getGlobalThreadID();
+	int n = worldSize[0] * worldSize[1] * worldSize[2];
+	dim3 pos = getWorldCoords(i, worldSize);
+    if (i<n) {
+		bufIn[pos.x][pos.y][pos.z*3  ] = bufOut[pos.x][pos.y][pos.z*3  ];
+		bufIn[pos.x][pos.y][pos.z*3+1] = bufOut[pos.x][pos.y][pos.z*3+1];
+		bufIn[pos.x][pos.y][pos.z*3+2] = bufOut[pos.x][pos.y][pos.z*3+2];
+    }
+}
+
 //http://zebu.uoregon.edu/disted/ph162/images/greenbalance.gif
 //thanks google
 extern "C"
@@ -344,6 +375,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 				temperatureOut[lat][lon][g] = temperatureOut[lat][lon][alt]; //set inground temp for ease of viewing in UI
 			break;
 		}
+		temperatureOut[lat][lon][alt] = 33;
 	}
 
 }
@@ -367,7 +399,7 @@ __global__ void infraredCooling(int* worldSize, float* worldTime, float* worldSp
 	float cp = specificHeatAir(tempIn[lat][lon][alt]);
 	if(alt==0 || altitudeOfIndex(alt, worldSize)*1000 <= elevation[lat][lon]){
 		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
-		wattsIR += SUN_WATTS * .09;
+		wattsIR = SUN_WATTS * .09;
 		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
 	}
 

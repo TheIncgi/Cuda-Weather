@@ -30,7 +30,8 @@ public class GpuGlobeRenderView extends BorderPane{
 			 renderSunshine = new CheckBox("Sunshine");
 	Slider zoom = new Slider(.5, 10, 1);
 	Slider elevation = new Slider(0, 1, 0);
-	ToolBar top = new ToolBar(rerender, overlayPicker, renderClouds, renderSnow, renderSunshine, zoom, elevation);
+	Button resetSim = new Button("Reset Sim");
+	ToolBar top = new ToolBar(rerender, overlayPicker, renderClouds, renderSnow, renderSunshine, zoom, elevation, resetSim);
 	/**Uses pointers from simulator to avoid copying data*/
 	public GpuGlobeRenderView() {
 		setTop(top);
@@ -56,6 +57,11 @@ public class GpuGlobeRenderView extends BorderPane{
 		renderSnow.setOnAction(this::updateFlags);
 		renderClouds.setOnAction(this::updateFlags);
 		renderSunshine.setOnAction(this::updateFlags);
+		
+		resetSim.setOnAction(e->{
+			simulator.initAtmosphere(true);
+			rerender.fire();
+		});
 	}
 	
 	private void updateFlags(ActionEvent e) {

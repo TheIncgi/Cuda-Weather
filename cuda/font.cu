@@ -72,6 +72,44 @@ __device__ char* intToStr(int num, char* str, int base)
  
     return str;
 }
+//123.456 ,*, 2
+__device__ char* floatToStr(float val, char* buf, int places) {
+	int charIndex = 0;
+	if(val==0){
+		buf[charIndex++] = '0';
+		buf[charIndex] = '\0';
+		return buf;
+	}
+
+	if(val < 0){
+		buf[charIndex++] = '-';
+		val = fabsf(val);
+	}
+	
+	int digits = log2f(val)/log2f(10);
+	digits = digits <-1 ? -1 : digits;
+	bool dec = false;
+	while( places > 0 ){
+		if(digits==-1 && !dec) {
+			if(charIndex==0)
+        		buf[charIndex++] = '0';
+			buf[charIndex++] = '.';
+			dec = true;
+		}
+
+		int d = val / exp10f(digits);
+		val = val - d*exp10f(digits--);
+
+		buf[charIndex++] = d + '0';
+		
+		if(dec){
+			places--;
+		}
+	}
+	buf[charIndex] = '\0';
+	
+	return buf;
+}
 
 __device__ void loadFont( uint8_t* data, FontData &fontData ) {
 	fontData.bytes = data;
@@ -125,4 +163,17 @@ __device__ int getFontStringPixel(FontData &fontData, const char* str, int dx, i
 		i++;
 	}
 	return -1;
+}
+
+__device__ void concat( const char* const &a, const char* const &b, char* out, int outSize ){
+	int c = 0;
+	int i = 0;
+	while(a[i] != '\0' && c < outSize){
+		out[c++] = a[i++];
+	}
+	i = 0;
+	while(b[i] != '\0' && c < outSize){
+		out[c++] = b[i++];
+	}
+	out[c] = '\0';
 }

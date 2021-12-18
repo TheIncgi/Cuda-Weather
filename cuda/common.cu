@@ -36,6 +36,7 @@ __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	return dim3(latitude, longitude, altitude);
 }
 
+//lat lon, not x, y...
 __device__ dim2 wrapCoords(int x, int y, int* worldSize){
 	int la = x;
 	int lo = y % worldSize[1];
@@ -129,5 +130,5 @@ __device__ float smoothstep(float a0, float a1, float w){
 //bit flag util
 
 __device__ bool hasFlag(int value, int test){
-	return value & test > 0;
+	return (value & test) > 0;
 }
