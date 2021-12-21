@@ -7,11 +7,15 @@ import static jcuda.driver.JCudaDriver.cuMemAlloc;
 import static jcuda.driver.JCudaDriver.cuMemcpyDtoH;
 import static jcuda.driver.JCudaDriver.cuMemcpyHtoD;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 
 import jcuda.CudaException;
@@ -159,5 +163,79 @@ public class CudaUtils {
 		cuMemAlloc(out, Sizeof.POINTER * pointers.length);
 		cuMemcpyHtoD(out, Pointer.to(pointers), Sizeof.POINTER * pointers.length);
 		return out;
+	}
+	
+	public static class CuWrappedModule implements Closeable {
+		private final String moduleFile;
+		private CUmodule module;
+		private HashMap<String, CuWrappedFunction> functions = new HashMap<>();
+		long lastEdit;
+		
+		public CuWrappedModule(String moduleFile) {
+			this.moduleFile = moduleFile;
+			this.module = loadModule(moduleFile);
+			lastEdit = new File(moduleFile).lastModified();
+		}
+
+		public CuWrappedFunction getFunction(String name) {
+			return functions.computeIfAbsent(name, k->{
+				return new CuWrappedFunction(this, name);
+			});
+		}
+		
+		public boolean needsReload() {
+			long modTime = new File(moduleFile).lastModified();
+			boolean out = lastEdit != modTime;
+			lastEdit = modTime;
+			return out;
+		}
+		
+		public boolean reload() {
+			if(!needsReload()) return false; //no changes
+			System.out.println("Reloading module: "+moduleFile);
+			close();
+			this.module = loadModule(moduleFile);
+			for (CuWrappedFunction func : functions.values()) {
+				func.reload();
+			}
+			return true;
+		}
+		
+		public CUmodule getModule() {
+			return module;
+		}
+		public String getModuleFile() {
+			return moduleFile;
+		}
+		
+		@Override
+		public void close() {
+			JCudaDriver.cuModuleUnload(module);
+		}
+	}
+	
+	public static class CuWrappedFunction {
+		private final CuWrappedModule module;
+		private final String functionName;
+		CUfunction function;
+		
+		public CuWrappedFunction(CuWrappedModule module, String functionName) {
+			this.module = module;
+			this.functionName = functionName;
+			this.function = CudaUtils.getFunction(module.getModule(), functionName);
+		}
+		public CuWrappedModule getModule() {
+			return module;
+		}
+		public String getFunctionName() {
+			return functionName;
+		}
+		public void reload() {
+			this.function = CudaUtils.getFunction(module.getModule(), functionName);
+		}
+		
+		public CUfunction getFunction() {
+			return function;
+		}
 	}
 }

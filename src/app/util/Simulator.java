@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import app.CudaUtils;
+import app.CudaUtils.CuWrappedFunction;
+import app.CudaUtils.CuWrappedModule;
 import app.GlobeData;
 import app.view.GpuGlobeRenderView;
 import jcuda.CudaException;
@@ -48,7 +50,7 @@ public class Simulator implements AutoCloseable{
 	//private Pointer[] kernalParams = new Pointer[2];
 	private int activeKernal = 0;
 	private boolean dataLoaded = false;
-	private CUmodule module, renderModule;
+	private CuWrappedModule module, renderModule;
 	private Optional<BiConsumer<Double,String>> progressListener = Optional.empty();
 //	private Triplet<CUfunction, Boolean, Pointer> atmosphereInit;
 	private Step renderStep, copyOver, atmosphereInit;
@@ -63,8 +65,8 @@ public class Simulator implements AutoCloseable{
 	}
 	
 	private void setupFuncs() {
-		module = loadModule("cuda/ptx/WeatherSim.ptx");
-		renderModule = loadModule("cuda/ptx/worldRender.ptx");
+		module = new CuWrappedModule("cuda/ptx/WeatherSim.ptx");
+		renderModule = new CuWrappedModule("cuda/ptx/worldRender.ptx");
 		Pointer worldSize = Pointer.to(worldSizePtr);
 		
 		var atmoArgs = Pointer.to(
@@ -74,7 +76,7 @@ public class Simulator implements AutoCloseable{
 				);
 		atmosphereInit = new Step(
 				"Init Atmosphere",
-				getFunction(module, "initAtmosphere"),
+				module.getFunction("initAtmosphere"),
 				true,
 				new Pointer[] {atmoArgs, atmoArgs}
 		);
@@ -82,7 +84,7 @@ public class Simulator implements AutoCloseable{
 		
 		
 		funcs = new Step[] {
-				copyOver = new Step("Copy",getFunction(module, "copy"), true, new Pointer[] {
+				copyOver = new Step("Copy",module.getFunction("copy"), true, new Pointer[] {
 						Pointer.to(
 							worldSize,
 							worldSpeed       .getArgPointer(),
@@ -127,7 +129,7 @@ public class Simulator implements AutoCloseable{
 								windSpeed     [0].getArgPointer()
 								)
 				}),
-				new Step("Calcuate Wind",getFunction(module, "calcWind"), true, new Pointer[] {
+				new Step("Calcuate Wind",module.getFunction("calcWind"), true, new Pointer[] {
 					Pointer.to(new Pointer[] {
 							worldSize,
 							worldSpeed     .getArgPointer(),
@@ -157,7 +159,7 @@ public class Simulator implements AutoCloseable{
 					})
 				}),
 				copyBack3Step("Wind", windSpeed, worldSize),
-				new Step("Solar Heating",getFunction(module, "solarHeating"), false, new Pointer[] {
+				new Step("Solar Heating",module.getFunction("solarHeating"), false, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -188,7 +190,7 @@ public class Simulator implements AutoCloseable{
 						})
 				}),
 				copyBackStep("Temp", temperature, worldSize),
-				new Step("Infared Cooling",getFunction(module, "infraredCooling"), true, new Pointer[] {
+				new Step("Infared Cooling",module.getFunction("infraredCooling"), true, new Pointer[] {
 						Pointer.to(new Pointer[] {
 								worldSize,
 								worldTimePtr[0].getArgPointer(),
@@ -230,7 +232,7 @@ public class Simulator implements AutoCloseable{
 				})	
 		};
 		
-		renderStep = new Step("Render", getFunction(renderModule, "render"), false, new Pointer[] {
+		renderStep = new Step("Render", renderModule.getFunction("render"), false, new Pointer[] {
 				Pointer.to(
 						worldSize,
 						elevation.getArgPointer(),
@@ -367,7 +369,7 @@ public class Simulator implements AutoCloseable{
 		
 		Step[] steps = new Step[] {atmosphereInit, copyOver};
 		for(Step step:steps) {
-			CUfunction f = step.function;
+			CUfunction f = step.function.getFunction();
 			double blocksNeeded = gridSizeX_withAtmosphere;
 			
 			int dimLimit = 65535;
@@ -397,6 +399,12 @@ public class Simulator implements AutoCloseable{
 	public synchronized long timeStep(boolean pullResult) {
 		//System.out.println("Begining timestep..");
 		long start = System.currentTimeMillis();
+		
+		if(module.reload()) {
+			System.out.println(module.getModuleFile() + " has been automaticly reloaded");
+//			dataLoaded = false; //needed?
+		}
+		
 		if(!dataLoaded) {
 			progress(0, "Pushing data", false);
 			pushData();
@@ -425,7 +433,7 @@ public class Simulator implements AutoCloseable{
 			Step step = funcs[i];
 			try {
 				progress((i+1) / (float)funcs.length, "Step "+(i+1)+" of "+funcs.length + " - " + step.stepName, !pullResult);
-				CUfunction f = step.function;
+				CUfunction f = step.function.getFunction();
 				double blocksNeeded = step.is3DSpace? gridSizeX_withAtmosphere : gridSizeX_groundOnly;
 				
 				int dimLimit = 65535;
@@ -448,7 +456,7 @@ public class Simulator implements AutoCloseable{
 		if(pullResult) {
 			JCudaDriver.cuCtxSynchronize();
 			progress(1, "Pulling result", !pullResult);
-			pullResult(); //read from input side while also computing
+			//pullResult(); //read from input side while also computing
 			progress(1, "Waiting for result", !pullResult);
 			JCudaDriver.cuCtxSynchronize();
 			onResultReady.run();
@@ -514,17 +522,17 @@ public class Simulator implements AutoCloseable{
 		cloudCover[1].close();
 		windSpeed[0].close();
 		windSpeed[1].close();
-		JCudaDriver.cuModuleUnload(module);
-		JCudaDriver.cuModuleUnload(renderModule);
+		module.close();
+		renderModule.close();
 	}
 	
 	private class Step {
 		String stepName;
-		CUfunction function;
+		CuWrappedFunction function;
 		Pointer[] args;
 		boolean is3DSpace;
 		
-		public Step(String step, CUfunction function, boolean is3DSpace, Pointer[] argSets) {
+		public Step(String step, CuWrappedFunction function, boolean is3DSpace, Pointer[] argSets) {
 			this.stepName = step;
 			this.function = function;
 			this.is3DSpace = is3DSpace;
@@ -539,12 +547,9 @@ public class Simulator implements AutoCloseable{
 	public void render(int[] buffer) {
 		
 		
-		if(CudaUtils.modifiedSinceRead("cuda/ptx/worldRender.ptx")) {
-			JCudaDriver.cuModuleUnload(renderModule);
-			renderModule = loadModule("cuda/ptx/worldRender.ptx");
-			renderStep.function = getFunction(renderModule, "render");
+		if(renderModule.reload()) {
 			System.out.println("Render module has been automaticly reloaded.");
-			dataLoaded = false;
+			dataLoaded = false; //TODO is this needed here?
 		}
 		if(!dataLoaded) {
 			progress(0, "Pushing data", false);
@@ -559,7 +564,7 @@ public class Simulator implements AutoCloseable{
 		int blockSizeX = 256;
 		long pixelCount = (long) Math.ceil(GpuGlobeRenderView.IMAGE_WIDTH * GpuGlobeRenderView.IMAGE_HEIGHT / (float)blockSizeX);
 		Step step = renderStep;
-		CUfunction f = step.function;
+		CUfunction f = step.function.getFunction();
 		double blocksNeeded = pixelCount;
 			
 		int dimLimit = 65535;
@@ -658,7 +663,7 @@ public class Simulator implements AutoCloseable{
 	
 	
 	private Step copyBackStep(String varName, CudaFloat2[] buf, Pointer worldSize) {
-		return new Step("Copy back "+varName, getFunction(module, "copyBack2f"), false, new Pointer[] {
+		return new Step("Copy back "+varName, module.getFunction("copyBack2f"), false, new Pointer[] {
 				Pointer.to(
 						worldSize,
 						buf[0].getArgPointer(),
@@ -672,7 +677,7 @@ public class Simulator implements AutoCloseable{
 		});
 	}
 	private Step copyBackStep(String varName, CudaFloat3[] buf, Pointer worldSize) {
-		return new Step("Copy back "+varName, getFunction(module, "copyBack3f"), false, new Pointer[] {
+		return new Step("Copy back "+varName, module.getFunction("copyBack3f"), false, new Pointer[] {
 				Pointer.to(
 						worldSize,
 						buf[0].getArgPointer(),
@@ -688,7 +693,7 @@ public class Simulator implements AutoCloseable{
 	
 	//for wind
 	private Step copyBack3Step(String varName, CudaFloat3[] buf, Pointer worldSize) {
-		return new Step("Copy back "+varName, getFunction(module, "copyBack3f3"), false, new Pointer[] {
+		return new Step("Copy back "+varName, module.getFunction("copyBack3f3"), false, new Pointer[] {
 				Pointer.to(
 						worldSize,
 						buf[0].getArgPointer(),

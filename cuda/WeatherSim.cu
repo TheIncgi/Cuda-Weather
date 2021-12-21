@@ -23,8 +23,8 @@ __device__ float altitudeOfIndex(int index, int* worldSize){
 
 //polar to cartesian
 __device__ vec3 mapTo3D(int *worldSize, int latitude, int longitude, int altitude, bool center){
-	float yaw = (float) (360.0 * (longitude + 0.5) / worldSize[1]);
-	float pitch = (float) (180.0 * (latitude + 0.5) / worldSize[0] -90.0);
+	float yaw = (float) (360.0 * (longitude + (center? 0.5 : 0)) / worldSize[1]);
+	float pitch = (float) (180.0 * (latitude + (center? 0.5 : 0)) / worldSize[0] -90.0);
 	vec3 p = {PLANET_RADIUS + altitudeOfIndex(altitude, worldSize), 0, 0};
 	rotateVec3AboutY(p, pitch * HALF_C);
 	rotVec3AboutZ(p, yaw * HALF_C);
@@ -39,6 +39,7 @@ __device__ float surfaceDistance(int lat1, int lon1, int alt1, int lat2, int lon
 	vec3 b = mapTo3D(worldSize, lat2, lon2, alt2, true);
 	return distance(a,b);
 }
+//Square Km
 __device__ float surfaceAreaAt(int* worldSize, int latitude, int altitude){
 	vec3 a = mapTo3D(worldSize, latitude,   0, altitude);
 	vec3 b = mapTo3D(worldSize, latitude,   1, altitude);
@@ -58,6 +59,18 @@ __device__ float CtoF(float celcius){
 }
 __device__ float FtoC(float f){
 	return (f-32) * 5/9;
+}
+__device__ float CtoK(float celcius){
+	return celcius + 273.15;
+}
+__device__ float KtoC(float kelvin){
+	return kelvin - 273.15;
+}
+__device__ float FtoK(float f){
+	return CtoK(FtoC(f));
+}
+__device__ float KtoF(float kelvin){
+	return CtoF(KtoC(kelvin));
 }
 
 /**aprox air density at temp kg per meter cubed
@@ -167,6 +180,16 @@ __device__ float biomeMass( int ground, int moisture){
 		case 7:  /*lake  */  kgPerCm = 1000;
 	}
 	return kgPerCm;
+}
+
+//https://en.wikipedia.org/wiki/Thermal_radiation#/media/File:Emissive_Power.svg
+//https://en.wikipedia.org/wiki/Thermal_radiation  Radiative Power
+__device__ float blackBodyEmissionK( float kelvin ){
+	//STEFAN_BOLTZMANN_CONSTANT
+	return STEFAN_BOLTZMANN_CONSTANT*(kelvin * kelvin * kelvin * kelvin);
+}
+__device__ float blackBodyEmissionF( float fahrenheit ){
+	return blackBodyEmissionK( FtoK(fahrenheit) );
 }
 //https://www.desmos.com/calculator/jut6bbsuw7
 //https://www.eng-tips.com/viewthread.cfm?qid=260422
@@ -318,10 +341,13 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 	//float rawSunshine = sun; //debug value
 	float scatterLoss = pow(.92, 1/(worldSize[2])); //8% loss over any world size after all altitude steps
 	float humidityAbsorbtion = pow(.81, 1/worldSize[2]);
+	
 	for(int alt = worldSize[2]-1; alt>=0; alt--){
 		float appliedWatts = 0;
 		float volume = volumeAt(worldSize, lat, alt);
-		float surface = surfaceAreaAt(worldSize, lat, alt);
+		
+		float surfaceKmSq = surfaceAreaAt(worldSize, lat, alt);
+		float surfaceMsq = SQ_M_IN_SQ_KM * surfaceKmSq;
 		float depth  = altitudeOfIndex(alt+1, worldSize) - altitudeOfIndex(alt, worldSize);
 		float cloud = cloudCover[lat][lon][alt];
 		float mass = airMass(volume, temperatureIn[lat][lon][alt], humidity[lat][lon][alt], pressure[lat][lon][alt]);
@@ -335,6 +361,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 		float humidityAbsorbtionFactor =  1-((1-humidityAbsorbtion) * humidity[lat][lon][alt] * (1-cloud)); //not doubling up on absorbtion of clouds
 		//when humidity    is 0, this factor is 1,
 		//when cloud cover is 1, this factor is 1
+		//TODO dry air has no interaction?
 		sun *= humidityAbsorbtionFactor;
 
 		//TODO heat air based on 1360 watts * humidityAbsorbtion
@@ -366,16 +393,15 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 		}
 
 		if(mass < 0)
-			temperatureOut[lat][lon][alt] = -95525;
+			temperatureOut[lat][lon][alt] = -95525; //debug value
 		else
-			temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts, mass, cp);
+			temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts*surfaceKmSq, mass, cp);
 
 		if(brk){
 			for(int g=alt; g>=0; g--)
 				temperatureOut[lat][lon][g] = temperatureOut[lat][lon][alt]; //set inground temp for ease of viewing in UI
 			break;
 		}
-		temperatureOut[lat][lon][alt] = 33;
 	}
 
 }
@@ -389,17 +415,18 @@ __global__ void infraredCooling(int* worldSize, float* worldTime, float* worldSp
 	int lon = pos.y;
 	int alt = pos.z;
 
-	const float SUN_WATTS = 1360;
+	//const float SUN_WATTS = 1360;
 	//float GROUND_IR    = SUN_WATTS * .09;
 	float AIR_IR = .60 / worldSize[2];//pow(.6, 1/(worldSize[2]));
-
+	float area = surfaceAreaAt(worldSize, lat, alt) * SQ_M_IN_SQ_KM;
 	float vol = volumeAt(worldSize, lat, alt);
 	float mass = airMass(vol, tempIn[lat][lon][alt], humidity[lat][lon][alt], pressure[lat][lon][alt]);
-	float wattsIR = AIR_IR * SUN_WATTS;
+	float wattsIR = blackBodyEmissionF( tempIn[lat][lon][alt] );
 	float cp = specificHeatAir(tempIn[lat][lon][alt]);
 	if(alt==0 || altitudeOfIndex(alt, worldSize)*1000 <= elevation[lat][lon]){
+		
 		mass = biomeMass(groundType[lat][lon], groundMoisture[lat][lon]);
-		wattsIR = SUN_WATTS * .09;
+		
 		cp = specificHeatTerrain(groundType[lat][lon], groundMoisture[lat][lon]);
 	}
 

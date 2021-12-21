@@ -65,6 +65,12 @@ __device__ float clamp(float x, float low, float high){
 	}
 	return x < low? low : (x > high ? high : x);
 }
+
+
+__device__ float clampedMap(float x, float inMin, float inMax, float outMin, float outMax) {
+	return clamp( map(x, inMin, inMax, outMin, outMax), outMin, outMax );
+}
+
 __device__ int sign(float val) {
     return ((0) < val) - (val < (0));
 }

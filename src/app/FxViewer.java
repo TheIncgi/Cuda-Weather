@@ -1,20 +1,23 @@
 package app;
 
 import app.util.Simulator;
-import app.view.GlobeViewer;
 import app.view.GpuGlobeRenderView;
 import app.view.LoadingPane;
 import app.view.WorldSizePicker;
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Slider;
 import javafx.scene.control.ToolBar;
 import javafx.scene.image.Image;
-import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
 public class FxViewer extends Application{
@@ -26,11 +29,15 @@ public class FxViewer extends Application{
 	//GlobeViewer gv = new GlobeViewer(dummy);
 //	Button blindStep = new Button("Blind Step");
 	ComboBox<Integer> stepCount = new ComboBox<>();
+	CheckBox autoStep = new CheckBox("Auto Step");
+	Slider autoStepSpeed = new Slider(.25, 100, 1);
+	Label autoStepLabel = new Label("x1"),
+		  autoStepTrueSpeedLabel = new Label();
 	Button timeStep = new Button("Step");
 	Button cancelButton = new Button("Cancel");
 	ProgressBar timestepProgress = new ProgressBar();
 	Label timeStepStatus = new Label("Not ready");
-	ToolBar simulationControls = new ToolBar(new Label("Steps: "),stepCount, timeStep, timestepProgress, timeStepStatus, cancelButton);
+	ToolBar simulationControls = new ToolBar(new Label("Steps: "),stepCount, timeStep, timestepProgress, timeStepStatus, cancelButton, autoStep, autoStepSpeed, autoStepLabel, autoStepTrueSpeedLabel);
 	Simulator simulator;
 	Thread bgThread;
 	GlobeData result;
@@ -41,6 +48,7 @@ public class FxViewer extends Application{
 	private boolean flag = false;
 	private volatile int timesteps = 0;
 	private Scene scene;
+	private AnimationTimer stepper;
 	@Override
 	public void start(Stage stage) throws Exception {
 		stage.setScene(scene = new Scene(wsp, 900, 600));
@@ -75,6 +83,23 @@ public class FxViewer extends Application{
 		
 		stepCount.getItems().addAll(1, 5, 10, 15, 20, 25, 30, 50, 100, 125, 150, 300, 500, 1000, 2000, 5000, 10000, 20000,25000,50000,75000,100000);
 		stepCount.getSelectionModel().select(0);
+		autoStep.selectedProperty().addListener(new ChangeListener<Boolean>() {
+			@Override
+			public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
+				onAutoStepToggle(newValue);
+			}
+		});
+		autoStepSpeed.setMajorTickUnit(.1);
+		autoStepSpeed.setShowTickMarks(true);
+		autoStepSpeed.setSnapToTicks(true);
+		autoStepLabel.setMinWidth(80);
+		autoStepLabel.setMaxWidth(80);
+		autoStepSpeed.valueProperty().addListener(e->{
+			double v = autoStepSpeed.getValue();
+			autoStepLabel.setText(v == 1? "Realtime" : (v < 1 ? "x1/"+(int)(1/v) : "x%4.2f".formatted(v)));
+			onAutoStepToggle(autoStep.isSelected());
+		});
+		autoStepSpeed.setPrefWidth(200);
 		
 		timeStep.setOnAction(e->{
 			System.out.println("Triggering timestep");
@@ -153,7 +178,7 @@ public class FxViewer extends Application{
 						flag = false;
 						cancel = false;
 						Platform.runLater(()->{
-							cancelButton.setVisible(true);
+							cancelButton.setVisible(!autoStep.isSelected());
 							cancelButton.setDisable(false);
 						});
 						
@@ -187,6 +212,39 @@ public class FxViewer extends Application{
 			System.out.println("BG Thread has exited");
 		}, "Simulation Thread");
 		bgThread.start();
+	}
+	
+	
+	private void onAutoStepToggle(boolean isSelected) {
+		if(stepper==null) {
+			stepper = new AnimationTimer() {
+				long next = System.currentTimeMillis();
+				private long delay(double rate) {
+					return (long) ((simulator.getTimestepSize() * 1000) / rate);
+				}
+				@Override
+				public void handle(long now) {
+					if(next <= System.currentTimeMillis()) {
+						next = System.currentTimeMillis() + delay(autoStepSpeed.getValue());
+						
+						flag = true;
+						synchronized (bgThread) {
+							bgThread.notify();
+						}
+					}
+				}
+			};
+		}
+		stepper.stop();
+		if(!isSelected) {
+			stepCount.setDisable(false);
+			timeStep.setDisable(false);
+		}else{
+			stepCount.setDisable(true);
+			timeStep.setDisable(true);
+			stepCount.getSelectionModel().select(0);
+			stepper.start();
+		}
 	}
 	
 }

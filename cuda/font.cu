@@ -80,10 +80,25 @@ __device__ char* floatToStr(float val, char* buf, int places) {
 		buf[charIndex] = '\0';
 		return buf;
 	}
+	if(isnan(val)){
+		buf[charIndex++] = 'N';
+		buf[charIndex++] = 'a';
+		buf[charIndex++] = 'N';
+		buf[charIndex++] = '\0';
+		return buf;
+	}
 
 	if(val < 0){
 		buf[charIndex++] = '-';
 		val = fabsf(val);
+	}
+
+	if(isinf(val)){
+		buf[charIndex++] = 'i';
+		buf[charIndex++] = 'n';
+		buf[charIndex++] = 'f';
+		buf[charIndex++] = '\0';
+		return buf;
 	}
 	
 	int digits = log2f(val)/log2f(10);

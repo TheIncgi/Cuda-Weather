@@ -15,6 +15,9 @@ float __constant__ PLANET_RADIUS = 6371; //km
 float __constant__ PLANET_MASS   = 5.972e24; //kg ...that's 5 septillion
 float __constant__ PLANET_TILT   = 23.5;
 float __constant__ GRAVITATIONAL_CONSTANT = 6.67E-11;
+float __constant__ STEFAN_BOLTZMANN_CONSTANT = 5.670374E-8;
+
+int __constant__ SQ_M_IN_SQ_KM = 1000000;
 
 int __constant__ SAND     = 0;
 int __constant__ DIRT     = 1;

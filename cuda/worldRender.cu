@@ -41,14 +41,41 @@ __device__ vec4 thermalColor( float degreesF, float opacity ) {
 	//33% green
 	//15% yellow
 	// 0%  red
-	degreesF = clamp(degreesF, -40, 110);
-	degreesF = 1 / (.0001 * (degreesF - 190)) + 110;
 	vec4 in;
-	in.x = degreesF;
-	in.y = 1;
-	in.z = 1;
+	
+	in.y = 1; //s
+	in.z = 1; //v
+
+	if(isnan(degreesF) || isinf(degreesF)) {
+		in.x = 310;
+	}else{
+		degreesF = clamp(degreesF, -40, 120);
+
+		if( degreesF < 50)
+			in.x = map( degreesF, -40, 50, 241,180);
+		else if( degreesF < 72 )
+			in.x = map( degreesF, 50, 71, 180, 124);
+		else if( degreesF < 85)
+			in.x = map( degreesF, 71, 85, 124, 60);
+		else
+			in.x = map( degreesF, 85, 100, 60, 0);
+		if( 100 < degreesF )
+			in.y = map( degreesF, 100, 120, 1, .5);
+	}
+	
 	in.w = opacity;
 	return hsvToArgb(in);
+}
+
+__device__ vec4 humidityColor( float humidity, float opacity ) {
+	// hue 183 degrees - sky blue
+	// hue 241 degrees - deep blue
+	vec4 color;
+	color.x = clampedMap( humidity, 0, 1, 183, 241 );
+	color.y = clamp( humidity, 0, 1);
+	color.z = 1;
+	color.w = opacity;
+	return color;
 }
 // |~~~~~~~~~~~~~~~~~~~~~
 // |     Render code
@@ -165,27 +192,41 @@ __device__ void renderFlat(
 
 		vec4 sunColor = sunshineColorArgb(latf, lonf, worldSize, worldTimeIn);
 		
-		if(hasFlag(overlayFlags, THERMAL_OVERLAY)){
+		bool useOverlayValue = false;
+		float overlayValue = 0;
+		int snapLat = ((int)(lat/3))*3;
+		int snapLon = ((int)(lon/3))*3;
+		dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
+		{
 			vec4 v4c  = hexToArgb(theColor);
-			vec4 thrm = thermalColor( temperatureIn[lat][lon][0], .6 );
-			v4c = mixColors( v4c, thrm );
+			vec4 overlayColor;
+			overlayColor.w = 0;
+			if(hasFlag(overlayFlags, THERMAL_OVERLAY)){
+				overlayValue = temperatureIn[snapped.x][snapped.y][0];
+				overlayColor = thermalColor( overlayValue, .6 );
+				useOverlayValue = true;
 
-			int snapLat = ((int)(lat/5))*5;
-			int snapLon = ((int)(lon/5))*5;
-			dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
-			float tblock = temperatureIn[snapped.x][snapped.y][0];
-			int groupX = x - snapLon * tileWidth;
-			int groupY = y - snapLat * tileHeight;
-			floatToStr( tblock, strBuf, 2 );
-			// strBuf[0] = 'G';
-			// strBuf[1] = '\0';
-			if(getFontStringPixel(fontData, strBuf, groupX, groupY) >= 0)
-				v4c = mixColors( v4c,  hexToArgb(0x88000000) );
+			}else if(hasFlag(overlayFlags, HUMIDITY_OVERLAY)) {
+				overlayValue = humidityIn[lat][lon][0];
+				overlayColor = humidityColor( overlayValue, .6 );
+				useOverlayValue = true;
+
+			}
+			v4c = mixColors( v4c, overlayColor );
 			theColor = argbToHex(v4c);
-		}else if(hasFlag(overlayFlags, HUMIDITY_OVERLAY)) {
+		
 
+			if(useOverlayValue){
+				int groupX = x - snapLon * tileWidth;
+				int groupY = y - snapLat * tileHeight;
+				floatToStr( overlayValue, strBuf, 2 );
+				// strBuf[0] = 'G';
+				// strBuf[1] = '\0';
+				if(getFontStringPixel(fontData, strBuf, (int)(groupX*1.5), groupY) >= 0)
+					v4c = mixColors( v4c,  hexToArgb(0x88000000) );
+				theColor = argbToHex(v4c);
+			}
 		}
-
 		if(hasFlag(overlayFlags, LIGHT_EFFECT)) //sunshine
 			theColor = argbToHex(multipyColor(hexToArgb(theColor), sunColor));
 		else{
@@ -215,18 +256,20 @@ __device__ void renderFlat(
 			theColor = 0xFFFF0000;
 
 		label = "Rev: ";
-		floatToStr( worldTimeIn[1], strBuf, 2 ); //rev
+		floatToStr( worldTimeIn[1], strBuf, 4 ); //rev
 		concat( label, strBuf, strBuf2, 100);
 		if(getFontStringPixel(fontData, strBuf2, x,y-64) >= 0)
 			theColor = 0xFFFF0000;
 
 		label = "Rot: ";
-		floatToStr( worldTimeIn[0], strBuf, 2 ); //rot
+		floatToStr( worldTimeIn[0], strBuf, 4 ); //rot
 		concat( label, strBuf, strBuf2, 100);
 		if(getFontStringPixel(fontData, strBuf2, x,y-96) >= 0)
 			theColor = 0xFFFF0000;
 
 
+		//
+		//imageOut[i] = 0xFF00FFFF;
 		imageOut[i] = theColor;//mixColors(theColor, blendColor, .5*distanceToEdge(lat, lon, latf, lonf));
 //		if(lat == 47)
 //			fragColor = 0xFFFF00FF;
