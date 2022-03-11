@@ -152,7 +152,8 @@ __device__ void renderFlat(
 		int*   imageSize,
 		int* imageOut,
 		int overlayFlags,
-		FontData &fontData){
+		FontData &fontData,
+		int* mousePos){
 
 		int x = i % imageSize[0];
 		int y = i / imageSize[0];
@@ -256,17 +257,20 @@ __device__ void renderFlat(
 			theColor = 0xFFFF0000;
 
 		label = "Rev: ";
-		floatToStr( worldTimeIn[1], strBuf, 4 ); //rev
+		floatToStr( worldTimeIn[1], strBuf, 5 ); //rev
 		concat( label, strBuf, strBuf2, 100);
 		if(getFontStringPixel(fontData, strBuf2, x,y-64) >= 0)
 			theColor = 0xFFFF0000;
 
 		label = "Rot: ";
-		floatToStr( worldTimeIn[0], strBuf, 4 ); //rot
+		floatToStr( worldTimeIn[0], strBuf, 5 ); //rot
 		concat( label, strBuf, strBuf2, 100);
 		if(getFontStringPixel(fontData, strBuf2, x,y-96) >= 0)
 			theColor = 0xFFFF0000;
 
+		// if(distance(mousePos[0],mousePos[1], x,y) < 3){
+		// 	theColor = 0xFFFFFFFF;
+		// }//FIXME turns the map yellow [tinted]????
 
 		//
 		//imageOut[i] = 0xFF00FFFF;
@@ -318,7 +322,8 @@ __global__ void render(
 			int*   imageSize,
 			int* imageOut,
 			int* overlayFlags,
-			uint8_t* font
+			uint8_t* font,
+			int* mousePos
 			) {
 	int i = getGlobalThreadID();
 	if(i>= imageSize[0]*imageSize[1]) return;
@@ -326,5 +331,5 @@ __global__ void render(
 	FontData fontData;
 	loadFont(font, fontData);
 
-	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut, *overlayFlags, fontData);
+	renderFlat(i, worldSize, elevation, groundType, worldTimeIn, groundMoistureIn, snowCoverIn, temperatureIn, pressureIn, humidityIn, cloudCoverIn, windSpeedIn, imageSize, imageOut, *overlayFlags, fontData, mousePos);
 }

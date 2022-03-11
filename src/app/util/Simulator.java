@@ -37,6 +37,7 @@ public class Simulator implements AutoCloseable{
 	private CudaInt1 imageOut;
 	private CudaByte1 rawFontData;
 	private CudaInt0 overlayFlags;
+	private CudaInt1 mouseInput;
 	private CudaInt2   groundType;
 	private CudaFloat2 elevation;    //not changed
 	private CudaFloat2[] groundMoisture = new CudaFloat2[2],
@@ -248,7 +249,8 @@ public class Simulator implements AutoCloseable{
 						imageSize.getArgPointer(),
 						imageOut.getArgPointer(),
 						overlayFlags.getArgPointer(),
-						rawFontData.getArgPointer()
+						rawFontData.getArgPointer(),
+						mouseInput.getArgPointer()
 				),Pointer.to(
 						worldSize,
 						elevation.getArgPointer(),
@@ -264,7 +266,8 @@ public class Simulator implements AutoCloseable{
 						imageSize.getArgPointer(),
 						imageOut.getArgPointer(),
 						overlayFlags.getArgPointer(),
-						rawFontData.getArgPointer()
+						rawFontData.getArgPointer(),
+						mouseInput.getArgPointer()
 				)
 		});
 		
@@ -292,6 +295,7 @@ public class Simulator implements AutoCloseable{
 		imageSize           = new CudaInt1(2);
 		imageOut            = new CudaInt1(GpuGlobeRenderView.IMAGE_HEIGHT * GpuGlobeRenderView.IMAGE_WIDTH);
 		overlayFlags        = new CudaInt0();
+		mouseInput          = new CudaInt1(2);
 		rawFontData			= new CudaByte1(fd.length);
 		rawFontData.push(fd);
 		
@@ -359,6 +363,10 @@ public class Simulator implements AutoCloseable{
 	
 	public synchronized void setOverlayFlags( int flags ) {
 		overlayFlags.push(flags);
+	}
+	
+	public synchronized void setMousePos( int x, int y ) {
+		mouseInput.push(new int[] {x,y});
 	}
 	
 	public void initAtmosphere(boolean force) {

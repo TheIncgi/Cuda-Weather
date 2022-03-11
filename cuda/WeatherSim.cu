@@ -263,8 +263,8 @@ __global__ void copy(
 	dim3 pos = getWorldCoords(i, worldSize);
     if (i<n) {
     	if(i==0){
-    		worldTimeOut[0] += worldSpeed[0];
-    		worldTimeOut[1] += worldSpeed[1];
+    		worldTimeOut[0] = worldTimeIn[0] + worldSpeed[0];
+    		worldTimeOut[1] = worldTimeIn[1] + worldSpeed[1];
     	}
     	if(pos.z==0){
     		groundMoistureOut[pos.x][pos.y] = groundMoistureIn[pos.x][pos.y];
@@ -395,7 +395,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 		if(mass < 0)
 			temperatureOut[lat][lon][alt] = -95525; //debug value
 		else
-			temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts*surfaceKmSq, mass, cp);
+			temperatureOut[lat][lon][alt] = tempChange(temperatureIn[lat][lon][alt], worldSpeed[2], appliedWatts, mass, cp);
 
 		if(brk){
 			for(int g=alt; g>=0; g--)

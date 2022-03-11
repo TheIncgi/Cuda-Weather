@@ -30,7 +30,7 @@ public class FxViewer extends Application{
 //	Button blindStep = new Button("Blind Step");
 	ComboBox<Integer> stepCount = new ComboBox<>();
 	CheckBox autoStep = new CheckBox("Auto Step");
-	Slider autoStepSpeed = new Slider(.25, 100, 1);
+	Slider autoStepSpeed = new Slider(10, 100, 1);
 	Label autoStepLabel = new Label("x1"),
 		  autoStepTrueSpeedLabel = new Label();
 	Button timeStep = new Button("Step");

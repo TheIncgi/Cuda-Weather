@@ -48,6 +48,9 @@ public class GpuGlobeRenderView extends BorderPane{
 		setCenter(new ScrollPane(imageView));
 		
 		imageView.setImage(img);
+		imageView.setOnMouseMoved(e->{
+			simulator.setMousePos((int) (e.getSceneX() - imageView.getLayoutX()), (int) (e.getSceneY()-imageView.getLayoutY()));
+		});
 		CudaUtils.init();
 	}
 	

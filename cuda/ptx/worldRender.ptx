@@ -58,7 +58,8 @@
 	.param .u64 render_param_11,
 	.param .u64 render_param_12,
 	.param .u64 render_param_13,
-	.param .u64 render_param_14
+	.param .u64 render_param_14,
+	.param .u64 render_param_15
 )
 {
 	.local .align 4 .b8 	__local_depot0[228];
@@ -11300,7 +11301,7 @@ BB0_1207:
 	cvt.rzi.s32.f32	%r3806, %f2304;
 	mov.u32 	%r3807, -1;
 	max.s32 	%r4448, %r3807, %r3806;
-	mov.u32 	%r4446, 4;
+	mov.u32 	%r4446, 5;
 
 BB0_1208:
 	and.b16  	%rs122, %rs190, 255;
@@ -11612,7 +11613,7 @@ BB0_1237:
 	cvt.rzi.s32.f32	%r3852, %f2387;
 	mov.u32 	%r3853, -1;
 	max.s32 	%r4458, %r3853, %r3852;
-	mov.u32 	%r4456, 4;
+	mov.u32 	%r4456, 5;
 
 BB0_1238:
 	and.b16  	%rs151, %rs195, 255;
