@@ -83,6 +83,9 @@ public class FxViewer extends Application{
 		
 		stepCount.getItems().addAll(1, 5, 10, 15, 20, 25, 30, 50, 100, 125, 150, 300, 500, 1000, 2000, 5000, 10000, 20000,25000,50000,75000,100000);
 		stepCount.getSelectionModel().select(0);
+		timeStepStatus.setPrefWidth(220);
+		timeStepStatus.setMinWidth(220);
+		timeStepStatus.setMaxWidth(220);
 		autoStep.selectedProperty().addListener(new ChangeListener<Boolean>() {
 			@Override
 			public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {

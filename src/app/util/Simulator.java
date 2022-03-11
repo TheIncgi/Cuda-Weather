@@ -361,6 +361,12 @@ public class Simulator implements AutoCloseable{
 		});
 	}
 	
+	public synchronized void setWorldTime(float rotations, float revolutions) {
+		float[] time = new float[] {rotations, revolutions};
+		worldTimePtr[0].push(time);
+		worldTimePtr[1].pull(time);;
+	}
+	
 	public synchronized void setOverlayFlags( int flags ) {
 		overlayFlags.push(flags);
 	}

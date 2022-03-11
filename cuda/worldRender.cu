@@ -270,7 +270,7 @@ __device__ void renderFlat(
 
 		// if(distance(mousePos[0],mousePos[1], x,y) < 3){
 		// 	theColor = 0xFFFFFFFF;
-		// }//FIXME turns the map yellow [tinted]????
+		// }//FIXME turns the map yellow [tinted] when no overlay????
 
 		//
 		//imageOut[i] = 0xFF00FFFF;

@@ -62,6 +62,7 @@ public class GpuGlobeRenderView extends BorderPane{
 		renderSunshine.setOnAction(this::updateFlags);
 		
 		resetSim.setOnAction(e->{
+			simulator.setWorldTime(0, 0);
 			simulator.initAtmosphere(true);
 			rerender.fire();
 		});
