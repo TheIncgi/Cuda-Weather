@@ -27,3 +27,17 @@ int __constant__ STONE    = 4;
 int __constant__ ICE      = 5; //ocean, but past 75 degrees, arctic circles are about 66, but that's seasonally related
 int __constant__ FOREST   = 6; //promoted from dirt, humid climates
 int __constant__ LAKE     = 7; //local minima of rainy areas
+
+__device__ const char * biomeName(int groundType) {
+	switch(groundType) {
+		case 0: return "SAND";
+		case 1: return "DIRT";
+		case 2: return "OCEAN";
+		case 3: return "GRASS";
+		case 4: return "STONE";
+		case 5: return "ICE";
+		case 6: return "FOREST";
+		case 7: return "LAKE";
+		default: return "???";
+	}
+}

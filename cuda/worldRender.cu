@@ -77,6 +77,15 @@ __device__ vec4 humidityColor( float humidity, float opacity ) {
 	color.w = opacity;
 	return color;
 }
+
+//in meters
+__device__ vec4 elevationColor( float elevation, float opacity ) {
+	vec4 color;
+	color.x = 0;
+	color.y = 0;
+	color.z = clampedMap( elevation, -500, 4000, 0 ,1 );
+	return color;
+}
 // |~~~~~~~~~~~~~~~~~~~~~
 // |     Render code
 // |~~~~~~~~~~~~~~~~~~~~~
@@ -167,6 +176,11 @@ __device__ void renderFlat(
 		float latf = y * ((float)worldSize[0]) / imageSize[1] + .5;
 		float lonf = x * ((float)worldSize[1]) / imageSize[0] + .5;
 
+		int   mouseLat  =         mousePos[1]  * worldSize[0] / imageSize[1];
+		int   mouseLon  =         mousePos[0]  * worldSize[1] / imageSize[0];
+		float mouseLatf = ((float)mousePos[1]) * worldSize[0] / imageSize[1];
+		float mouseLonf = ((float)mousePos[0]) * worldSize[1] / imageSize[0];
+
 		float tileWidth  = imageSize[0] / (float)worldSize[1];
 		float tileHeight = imageSize[1] / (float)worldSize[0];
 
@@ -200,8 +214,9 @@ __device__ void renderFlat(
 		dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
 		{
 			vec4 v4c  = hexToArgb(theColor);
-			vec4 overlayColor;
+			vec4 overlayColor = hexToArgb(0);
 			overlayColor.w = 0;
+
 			if(hasFlag(overlayFlags, THERMAL_OVERLAY)){
 				overlayValue = temperatureIn[snapped.x][snapped.y][0];
 				overlayColor = thermalColor( overlayValue, .6 );
@@ -212,6 +227,16 @@ __device__ void renderFlat(
 				overlayColor = humidityColor( overlayValue, .6 );
 				useOverlayValue = true;
 
+			}else if(hasFlag(overlayFlags, WIND_OVERLAY)) {
+
+			}else if(hasFlag(overlayFlags,SNOW_COVER_OVERLAY)){
+
+			}else if(hasFlag(overlayFlags, PERCIPITATION_OVERLAY)){
+
+			}else if(hasFlag(overlayFlags, ELEVATION_OVERLAY)) {
+				overlayValue = elevation[lat][lon];
+				overlayColor = elevationColor( overlayValue, .6 );
+				useOverlayValue =- true;
 			}
 			v4c = mixColors( v4c, overlayColor );
 			theColor = argbToHex(v4c);
@@ -268,9 +293,32 @@ __device__ void renderFlat(
 		if(getFontStringPixel(fontData, strBuf2, x,y-96) >= 0)
 			theColor = 0xFFFF0000;
 
-		// if(distance(mousePos[0],mousePos[1], x,y) < 3){
-		// 	theColor = 0xFFFFFFFF;
-		// }//FIXME turns the map yellow [tinted] when no overlay????
+		{
+			label = "Biome: ";
+			concat( label, strBuf, strBuf2, 100);
+			if(getFontStringPixel(fontData, biomeName( groundType[mouseLat][mouseLon] ), x,y-128) >= 0)
+				theColor = 0xFFFF0000;
+		}
+
+		{
+			label = "Sun: ";
+			floatToStr( sunshine(mouseLat, mouseLon, worldSize, worldTimeIn), strBuf, 5 ); //rot
+			concat( label, strBuf, strBuf2, 100);
+			if(getFontStringPixel(fontData, strBuf2, x,y-160) >= 0)
+				theColor = 0xFFFF0000;
+		}
+
+		{
+			label = "Elevation: ";
+			floatToStr( elevation[mouseLat][mouseLon], strBuf, 5 ); //rot
+			concat( label, strBuf, strBuf2, 100);
+			if(getFontStringPixel(fontData, strBuf2, x,y-192) >= 0)
+				theColor = 0xFFFF0000;
+		}
+		if(distance(mousePos[0],mousePos[1], x,y) < 3){
+			theColor = mixColors_hex( theColor, 0xFFFFFFFF, .3 );
+			// theColor = 0xFFFFFFFF;
+		}
 
 		//
 		//imageOut[i] = 0xFF00FFFF;

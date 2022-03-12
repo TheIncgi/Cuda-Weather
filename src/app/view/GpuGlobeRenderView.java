@@ -49,7 +49,7 @@ public class GpuGlobeRenderView extends BorderPane{
 		
 		imageView.setImage(img);
 		imageView.setOnMouseMoved(e->{
-			simulator.setMousePos((int) (e.getSceneX() - imageView.getLayoutX()), (int) (e.getSceneY()-imageView.getLayoutY()));
+			simulator.setMousePos((int) e.getX(), (int) e.getY()); //e.getSceneX() - imageView.getLayoutX()), (int) (e.getSceneY()-imageView.getLayoutY())
 		});
 		CudaUtils.init();
 	}
@@ -91,7 +91,7 @@ public class GpuGlobeRenderView extends BorderPane{
 		
 		var overlay = overlayPicker.getSelectionModel().getSelectedItem();
 		if(!overlay.equals(Overlay.NONE))
-			flags |= overlay.ordinal() << 3;
+			flags |= 1 << + overlay.ordinal();
 		
 		return flags;
 	}
