@@ -10,6 +10,7 @@
 #include<stdint.h>
 #include<string>
 #include "font.cu"
+#include "math.h"
 
 //[x bits - map mode][2 bits - effects/layers]
 int __constant__          LIGHT_EFFECT =   1;
@@ -78,13 +79,49 @@ __device__ vec4 humidityColor( float humidity, float opacity ) {
 	return color;
 }
 
+__device__ float interpolatedElevation( float lat, float lon, float** elevation, int* worldSize ) {
+	int rootLat = (int)(lat-.5);
+	int rootLon = (int)(lon-.5);
+
+	float latFactor = lat - (rootLat + .5);
+	float lonFactor = lon - (rootLon + .5);
+
+	if( latFactor < 0 || lonFactor < 0 || 1 < latFactor || 1 < lonFactor ) {
+		return -100000;
+	}
+	// a -e-- b
+	//    x
+	// c -f-- d
+	dim2 a = wrapCoords( rootLat    , rootLon    , worldSize );
+	dim2 b = wrapCoords( rootLat    , rootLon + 1, worldSize );
+	dim2 c = wrapCoords( rootLat + 1, rootLon    , worldSize );
+	dim2 d = wrapCoords( rootLat + 1, rootLon + 1, worldSize );
+
+	int elevA = elevation[a.x][a.y];
+	int elevB = elevation[b.x][b.y];
+	int elevC = elevation[c.x][c.y];
+	int elevD = elevation[d.x][d.y];
+
+	float e = map( latFactor, 0, 1, elevA, elevC );
+	float f = map( latFactor, 0, 1, elevB, elevD );
+
+	return map( lonFactor, 0, 1, e, f );
+}
+
 //in meters
 __device__ vec4 elevationColor( float elevation, float opacity ) {
 	vec4 color;
-	color.x = 0;
-	color.y = 0;
-	color.z = clampedMap( elevation, -500, 4000, 0 ,1 );
-	return color;
+
+	if( fmod(elevation,100.0) < 1.0 )
+		return hexToArgb(0xFFFF0000);
+
+	float v = clampedMap( elevation, -500, 4000, 0 ,1 );
+	v = sqrt( v );
+	color.w = opacity;
+	color.x = v;
+	color.y = v;
+	color.z = v;
+	return  color;
 }
 // |~~~~~~~~~~~~~~~~~~~~~
 // |     Render code
@@ -212,6 +249,8 @@ __device__ void renderFlat(
 		int snapLat = ((int)(lat/3))*3;
 		int snapLon = ((int)(lon/3))*3;
 		dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
+
+		//Overlays
 		{
 			vec4 v4c  = hexToArgb(theColor);
 			vec4 overlayColor = hexToArgb(0);
@@ -234,9 +273,10 @@ __device__ void renderFlat(
 			}else if(hasFlag(overlayFlags, PERCIPITATION_OVERLAY)){
 
 			}else if(hasFlag(overlayFlags, ELEVATION_OVERLAY)) {
+				float interElev = interpolatedElevation( latf, lonf, elevation, worldSize );
 				overlayValue = elevation[lat][lon];
-				overlayColor = elevationColor( overlayValue, .6 );
-				useOverlayValue =- true;
+				overlayColor = elevationColor( interElev, .8 );
+				useOverlayValue = true;
 			}
 			v4c = mixColors( v4c, overlayColor );
 			theColor = argbToHex(v4c);
@@ -261,7 +301,7 @@ __device__ void renderFlat(
 				theColor = argbToHex(mixColors( hexToArgb(theColor),hexToArgb(0x88FF0000)));
 		}
 
-		const char* str = "It's a good day if we render some text :D";
+		const char* str = "Debug Info";
 		if(getFontStringPixel(fontData, str, x-1,y-1) >= 0)
 			theColor = 0xFFFFFFFF;
 		if(getFontStringPixel(fontData, str, x+1,y+1) >= 0)
