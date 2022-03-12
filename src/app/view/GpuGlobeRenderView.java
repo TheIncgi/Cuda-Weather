@@ -91,7 +91,7 @@ public class GpuGlobeRenderView extends BorderPane{
 		
 		var overlay = overlayPicker.getSelectionModel().getSelectedItem();
 		if(!overlay.equals(Overlay.NONE))
-			flags |= 1 << + overlay.ordinal();
+			flags |= 1 << (2 + overlay.ordinal());
 		
 		return flags;
 	}
