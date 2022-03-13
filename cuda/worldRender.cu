@@ -110,6 +110,38 @@ __device__ float interpolatedElevation( float lat, float lon, float** elevation,
 	return map( lonFactor, 0, 1, e, f );
 }
 
+__device__ float interpolatedTemperature( float lat, float lon, int alt, float*** temperature, int* worldSize ) { //TODO smooth alt
+	lat -= .5;
+	lon -= .5;
+
+	int rootLat = floor(lat-.5);
+	int rootLon = floor(lon-.5);
+
+	float latFactor = lat - (rootLat + .5);
+	float lonFactor = lon - (rootLon + .5);
+
+	if( latFactor < 0 || lonFactor < 0 || 1 < latFactor || 1 < lonFactor ) {
+		return -100000;
+	}
+	// a -e-- b
+	//    x
+	// c -f-- d
+	dim2 a = wrapCoords( rootLat    , rootLon    , worldSize );
+	dim2 b = wrapCoords( rootLat    , rootLon + 1, worldSize );
+	dim2 c = wrapCoords( rootLat + 1, rootLon    , worldSize );
+	dim2 d = wrapCoords( rootLat + 1, rootLon + 1, worldSize );
+
+	float elevA = temperature[a.x][a.y][alt];
+	float elevB = temperature[b.x][b.y][alt];
+	float elevC = temperature[c.x][c.y][alt];
+	float elevD = temperature[d.x][d.y][alt];
+
+	float e = map( latFactor, 0, 1, elevA, elevC );
+	float f = map( latFactor, 0, 1, elevB, elevD );
+
+	return map( lonFactor, 0, 1, e, f );
+}
+
 //in meters
 __device__ vec4 elevationColor( float elevation, float opacity ) {
 	vec4 color;
@@ -215,6 +247,7 @@ __device__ void renderFlat(
 //		int cy = imageSize[1]/2;
 		int lat    = y *         worldSize[0]  / imageSize[1];
 		int lon    = x *         worldSize[1]  / imageSize[0];
+		int alt    = 0;
 		float latf = y * ((float)worldSize[0]) / imageSize[1] + .5;
 		float lonf = x * ((float)worldSize[1]) / imageSize[0] + .5;
 
@@ -253,7 +286,7 @@ __device__ void renderFlat(
 		float overlayValue = 0;
 		int snapLat = ((int)(lat/3))*3;
 		int snapLon = ((int)(lon/3))*3;
-		dim2 snapped = wrapCoords(snapLat+2, snapLon + 2, worldSize);
+		dim2 snapped = wrapCoords(snapLat, snapLon, worldSize);
 
 		//Overlays
 		{
@@ -263,7 +296,7 @@ __device__ void renderFlat(
 
 			if(hasFlag(overlayFlags, THERMAL_OVERLAY)){
 				overlayValue = temperatureIn[snapped.x][snapped.y][0];
-				overlayColor = thermalColor( overlayValue, .6 );
+				overlayColor = thermalColor( interpolatedTemperature( latf, lonf, alt, temperatureIn, worldSize ), .75 );
 				useOverlayValue = true;
 
 			}else if(hasFlag(overlayFlags, HUMIDITY_OVERLAY)) {
@@ -359,6 +392,14 @@ __device__ void renderFlat(
 			floatToStr( interElev, strBuf, 5 ); //rot
 			concat( label, strBuf, strBuf2, 100);
 			if(getFontStringPixel(fontData, strBuf2, x,y-192) >= 0)
+				theColor = 0xFFFF0000;
+		}
+		{
+			label = "Temperature: ";
+			float interTemp = interpolatedTemperature( mouseLatf, mouseLonf,alt, temperatureIn, worldSize );
+			floatToStr( interTemp, strBuf, 5 ); //rot
+			concat( label, strBuf, strBuf2, 100);
+			if(getFontStringPixel(fontData, strBuf2, x,y-224) >= 0)
 				theColor = 0xFFFF0000;
 		}
 		if(distance(mousePos[0],mousePos[1], x,y) < 3){
