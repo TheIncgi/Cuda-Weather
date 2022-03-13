@@ -80,8 +80,10 @@ __device__ vec4 humidityColor( float humidity, float opacity ) {
 }
 
 __device__ float interpolatedElevation( float lat, float lon, float** elevation, int* worldSize ) {
-	int rootLat = (int)(lat-.5);
-	int rootLon = (int)(lon-.5);
+	lat -= .5;
+	lon -= .5;
+	int rootLat = floor(lat-.5);
+	int rootLon = floor(lon-.5);
 
 	float latFactor = lat - (rootLat + .5);
 	float lonFactor = lon - (rootLon + .5);
@@ -97,10 +99,10 @@ __device__ float interpolatedElevation( float lat, float lon, float** elevation,
 	dim2 c = wrapCoords( rootLat + 1, rootLon    , worldSize );
 	dim2 d = wrapCoords( rootLat + 1, rootLon + 1, worldSize );
 
-	int elevA = elevation[a.x][a.y];
-	int elevB = elevation[b.x][b.y];
-	int elevC = elevation[c.x][c.y];
-	int elevD = elevation[d.x][d.y];
+	float elevA = elevation[a.x][a.y];
+	float elevB = elevation[b.x][b.y];
+	float elevC = elevation[c.x][c.y];
+	float elevD = elevation[d.x][d.y];
 
 	float e = map( latFactor, 0, 1, elevA, elevC );
 	float f = map( latFactor, 0, 1, elevB, elevD );
@@ -112,8 +114,11 @@ __device__ float interpolatedElevation( float lat, float lon, float** elevation,
 __device__ vec4 elevationColor( float elevation, float opacity ) {
 	vec4 color;
 
-	if( fmod(elevation,100.0) < 1.0 )
-		return hexToArgb(0xFFFF0000);
+	if( nfmod(elevation,(float)100.0) < 50.0 ) {
+		color = hexToArgb(0xFFFF8800);
+		color.w = opacity;
+		return color;
+	}
 
 	float v = clampedMap( elevation, -500, 4000, 0 ,1 );
 	v = sqrt( v );
@@ -275,7 +280,7 @@ __device__ void renderFlat(
 			}else if(hasFlag(overlayFlags, ELEVATION_OVERLAY)) {
 				float interElev = interpolatedElevation( latf, lonf, elevation, worldSize );
 				overlayValue = elevation[lat][lon];
-				overlayColor = elevationColor( interElev, .8 );
+				overlayColor = elevationColor( interElev, .6 );
 				useOverlayValue = true;
 			}
 			v4c = mixColors( v4c, overlayColor );
@@ -316,7 +321,7 @@ __device__ void renderFlat(
 		
 		
 		intToStr( overlayFlags , strBuf, 16 );
-		const char* label = "Flags: ";
+		const char* label = "Flags: 0x";
 		concat( label, strBuf, strBuf2, 100);
 		if(getFontStringPixel(fontData, strBuf2, x,y-32) >= 0)
 			theColor = 0xFFFF0000;
@@ -350,7 +355,8 @@ __device__ void renderFlat(
 
 		{
 			label = "Elevation: ";
-			floatToStr( elevation[mouseLat][mouseLon], strBuf, 5 ); //rot
+			float interElev = interpolatedElevation( mouseLatf, mouseLonf, elevation, worldSize );
+			floatToStr( interElev, strBuf, 5 ); //rot
 			concat( label, strBuf, strBuf2, 100);
 			if(getFontStringPixel(fontData, strBuf2, x,y-192) >= 0)
 				theColor = 0xFFFF0000;

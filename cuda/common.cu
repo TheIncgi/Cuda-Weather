@@ -27,6 +27,36 @@ __device__ int getGlobalThreadID(){
 	return getLocalThreadID() + getBlockID() * getThreadsPerBlock();
 }
 
+
+__device__ float map(float x, float inMin, float inMax, float outMin, float outMax) {
+	return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+__device__ float clamp(float x, float low, float high){
+	if(high < low){
+		int t = low;
+		low = high;
+		high = t;
+	}
+	return x < low? low : (x > high ? high : x);
+}
+
+__device__ float clampedMap(float x, float inMin, float inMax, float outMin, float outMax) {
+	return clamp( map(x, inMin, inMax, outMin, outMax), outMin, outMax );
+}
+
+__device__ int sign(float val) {
+    return ((0) < val) - (val < (0));
+}
+
+__device__ float nfmod(float value, float div) {
+	if(value < 0) {
+		return div - fmod( -value, div );
+	}
+	return fmod( value, div );
+}
+
+
 __device__ dim3 getWorldCoords(int gThreadID, int* worldSize){
 	int latitude =  gThreadID % worldSize[0];
 	gThreadID = gThreadID / worldSize[0];
@@ -53,27 +83,23 @@ __device__ dim2 wrapCoords(int x, int y, int* worldSize){
 	return out;
 }
 
-__device__ float map(float x, float inMin, float inMax, float outMin, float outMax) {
-	return (x - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-}
-
-__device__ float clamp(float x, float low, float high){
-	if(high < low){
-		int t = low;
-		low = high;
-		high = t;
+__device__ vec2 wrapCoordsF(float lat, float lon, int* worldSize) {
+	float la = lat;
+	float lo = nfmod(lon, (float)worldSize[1]);
+	if(la < 0){
+		lo = nfmod((lo + worldSize[1] / 2), (float)worldSize[1]);
+		la = -la -1;
+	}else if(la >= worldSize[0]){
+		lo = nfmod((lo + worldSize[1] / 2), worldSize[1]);
+		la = worldSize[0]-(la-worldSize[0]+1);
 	}
-	return x < low? low : (x > high ? high : x);
+	la = nfmod((la + worldSize[0]), (float)worldSize[0]);
+	lo = nfmod((lo + worldSize[1]), (float)worldSize[1]);
+	vec2 out = {la, lo};
+	return out;
 }
 
 
-__device__ float clampedMap(float x, float inMin, float inMax, float outMin, float outMax) {
-	return clamp( map(x, inMin, inMax, outMin, outMax), outMin, outMax );
-}
-
-__device__ int sign(float val) {
-    return ((0) < val) - (val < (0));
-}
 
 __device__ float distance(vec3 a, vec3 b){
 	float dx = b.x-a.x;
@@ -118,11 +144,7 @@ __device__ float sunshine(float lat, float lon, int* worldSize, float* worldTime
 
 	return clamp(dot(sun,p), 0, 1); //praise the sun
 }
-///////////// Perlin ///////////////// //TODO make this into a sep file, share with Terrain gen
-
-
-
-
+///////////// Perlin /////////////////
 
 __device__ float interpolate(float x, float y,float f){
 	return clamp( x * (1-f) + y * f,   x, y);
