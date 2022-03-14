@@ -28,3 +28,8 @@ gameData.dat
 /.gradle/
 /bin/
 /target/
+Compile ptx - world renderer.launch
+Compile ptx - weatherSim.launch
+Compile ptx - world renderer.launch
+Compile ptx - TerrainGen.launch
+cuda/ptx/*.ptx
