@@ -147,7 +147,7 @@ __device__ float groundReflectance(int groundType, float moisture){
 	case 6:  /*forest*/   r=.10;  break;
 	case 7:  /*lake  */   r=.85;  break; //made this slightly brighter than the ocean
 	}
-	return map(clamp(moisture,0,1), 0, 1, r, .85/*lake value*/);//fully/over saturated areas form reflective puddles/flood zones
+	return map(clamp(moisture,0,1), 0, 1, r, LAKE);//fully/over saturated areas form reflective puddles/flood zones
 }
 __device__ float specificHeatAir(float temp) {
 	return map(temp, CtoF(0), 70,.7171,  1); //TODO verify, not really a proper formula
@@ -201,8 +201,9 @@ __device__ float tempChange(float currentTemp, float seconds, float watts, float
 	return CtoF( (seconds*watts)/(mass*cp) + currentTemp );
 }
 
-//Host accessable functions
-
+///////////////////////////////
+// Host accessable functions //
+///////////////////////////////
 
 /**
  * Setup a world pressure and temperature
