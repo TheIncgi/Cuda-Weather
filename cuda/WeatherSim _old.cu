@@ -328,9 +328,6 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 	// 46% absorbed by surface                  88.5%    52%
 	//  6% reflected by surface                 11.5%
 	//if(true) return;
-
-	//TODO raycast checks / shadow checks where sun angle > ? between tile and 
-
 	int i = getGlobalThreadID();
 	int n = worldSize[0] * worldSize[1] * worldSize[2];
 	dim3 pos = getWorldCoords(i, worldSize);
@@ -339,7 +336,7 @@ __global__ void solarHeating(int* worldSize, float* worldTime, float* worldSpeed
 	int lon = pos.y;
 
 
-	const float SUN_WATTS = 1360; //real, 1360
+	const float SUN_WATTS = 1360; //not real, 1360
 	float sun = sunshine(lat, lon, worldSize, worldTime);
 	//float rawSunshine = sun; //debug value
 	float scatterLoss = pow(.92, 1/(worldSize[2])); //8% loss over any world size after all altitude steps
@@ -435,7 +432,7 @@ __global__ void infraredCooling(int* worldSize, float* worldTime, float* worldSp
 
 	float idk = .5f;
 
-	// tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldSpeed[2], -wattsIR * idk, mass, cp);
+	tempOut[lat][lon][alt] = tempChange(tempIn[lat][lon][alt], worldSpeed[2], -wattsIR * idk, mass, cp);
 }
 extern "C"
 __global__ void calcWind(
