@@ -11,6 +11,7 @@
 #include<string>
 #include "font.cu"
 #include "math.h"
+#include "WeatherSim.cu" //for more debug info
 
 //[x bits - map mode][2 bits - effects/layers]
 int __constant__          LIGHT_EFFECT =   1;
@@ -372,35 +373,46 @@ __device__ void renderFlat(
 			theColor = 0xFFFF0000;
 
 		{
-			label = "Biome: ";
-			concat( label, strBuf, strBuf2, 100);
-			if(getFontStringPixel(fontData, biomeName( groundType[mouseLat][mouseLon] ), x,y-128) >= 0)
-				theColor = 0xFFFF0000;
-		}
-
-		{
-			label = "Sun: ";
-			floatToStr( sunshine(mouseLat, mouseLon, worldSize, worldTimeIn), strBuf, 5 ); //rot
-			concat( label, strBuf, strBuf2, 100);
-			if(getFontStringPixel(fontData, strBuf2, x,y-160) >= 0)
-				theColor = 0xFFFF0000;
-		}
-
-		{
-			label = "Elevation: ";
-			float interElev = interpolatedElevation( mouseLatf, mouseLonf, elevation, worldSize );
-			floatToStr( interElev, strBuf, 5 ); //rot
-			concat( label, strBuf, strBuf2, 100);
-			if(getFontStringPixel(fontData, strBuf2, x,y-192) >= 0)
-				theColor = 0xFFFF0000;
-		}
-		{
-			label = "Temperature: ";
+			int mouseGround = groundType[mouseLat][mouseLon];
 			float interTemp = interpolatedTemperature( mouseLatf, mouseLonf,alt, temperatureIn, worldSize );
-			floatToStr( interTemp, strBuf, 5 ); //rot
-			concat( label, strBuf, strBuf2, 100);
-			if(getFontStringPixel(fontData, strBuf2, x,y-224) >= 0)
-				theColor = 0xFFFF0000;
+			float biomeMassVal = biomeMass( mouseGround, groundMoistureIn[lat][lon] );
+			{
+				label = "Biome: ";
+				concat( label, strBuf, strBuf2, 100);
+				if(getFontStringPixel(fontData, biomeName( mouseGround ), x,y-128) >= 0)
+					theColor = 0xFFFF0000;
+			}
+
+			{
+				label = "Sun: ";
+				floatToStr( sunshine(mouseLat, mouseLon, worldSize, worldTimeIn), strBuf, 5 ); //rot
+				concat( label, strBuf, strBuf2, 100);
+				if(getFontStringPixel(fontData, strBuf2, x,y-160) >= 0)
+					theColor = 0xFFFF0000;
+			}
+
+			{
+				label = "Elevation: ";
+				float interElev = interpolatedElevation( mouseLatf, mouseLonf, elevation, worldSize );
+				floatToStr( interElev, strBuf, 5 ); //rot
+				concat( label, strBuf, strBuf2, 100);
+				if(getFontStringPixel(fontData, strBuf2, x,y-192) >= 0)
+					theColor = 0xFFFF0000;
+			}
+			{
+				label = "Temperature: ";
+				floatToStr( interTemp, strBuf, 5 ); //rot
+				concat( label, strBuf, strBuf2, 100);
+				if(getFontStringPixel(fontData, strBuf2, x,y-224) >= 0)
+					theColor = 0xFFFF0000;
+			}
+			{
+				label = "BiomeMass: ";
+				floatToStr( biomeMassVal, strBuf, 13 ); //rot
+				concat( label, strBuf, strBuf2, 100);
+				if(getFontStringPixel(fontData, strBuf2, x,y-256) >= 0)
+					theColor = 0xFFFF0000;
+			}
 		}
 		if(distance(mousePos[0],mousePos[1], x,y) < 3){
 			theColor = mixColors_hex( theColor, 0xFFFFFFFF, .3 );
